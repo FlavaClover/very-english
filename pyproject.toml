@@ -14,7 +14,9 @@ dependencies = [
     "alembic (>=1.18.4,<2.0.0)",
     "greenlet (>=3.5.1,<4.0.0)",
     "python-dotenv (>=1.2.2,<2.0.0)",
-    "aioboto3 (>=15.5.0,<16.0.0)"
+    "aioboto3 (>=15.5.0,<16.0.0)",
+    "pyjwt (>=2.13.0,<3.0.0)",
+    "bcrypt (>=5.0.0,<6.0.0)"
 ]
 
 
@@ -36,7 +38,7 @@ asyncio_mode = "auto"
 
 [tool.mypy]
 python_version = "3.14"
-files = ["core", "infra", "main.py"]
+files = ["auth", "core", "infra", "main.py"]
 exclude = ["migrations/"]
 explicit_package_bases = true
 

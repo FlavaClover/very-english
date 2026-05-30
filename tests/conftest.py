@@ -54,6 +54,8 @@ def clean_db(engine: Engine) -> None:
             text(
                 """
                 TRUNCATE TABLE
+                    users_tutor,
+                    users,
                     points,
                     videos,
                     status_history,
