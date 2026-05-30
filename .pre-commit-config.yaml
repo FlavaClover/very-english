@@ -1,0 +1,38 @@
+fail_fast: true
+
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+    -   id: check-yaml
+    -   id: end-of-file-fixer
+        exclude: ^migrations/
+    -   id: trailing-whitespace
+        exclude: ^(tests/fixtures/|migrations/)
+
+-   repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.9
+    hooks:
+    -   id: ruff-check
+        args: [--fix]
+        exclude: ^migrations/
+    -   id: ruff-format
+        exclude: ^migrations/
+
+-   repo: local
+    hooks:
+
+    -   id: mypy
+        name: mypy
+        entry: poetry run mypy
+        args: [core, main.py]
+        language: system
+        pass_filenames: false
+        always_run: true
+
+    -   id: pytest-check
+        name: pytest-check
+        entry: pytest -n 5
+        language: system
+        pass_filenames: false
+        always_run: true
