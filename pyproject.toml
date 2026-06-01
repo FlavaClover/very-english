@@ -16,7 +16,10 @@ dependencies = [
     "python-dotenv (>=1.2.2,<2.0.0)",
     "aioboto3 (>=15.5.0,<16.0.0)",
     "pyjwt (>=2.13.0,<3.0.0)",
-    "bcrypt (>=5.0.0,<6.0.0)"
+    "bcrypt (>=5.0.0,<6.0.0)",
+    "uvicorn (>=0.40.0,<0.41.0)",
+    "python-multipart (>=0.0.22,<0.0.23)",
+    "redis (>=5.0.0,<9.0.0)"
 ]
 
 
@@ -32,16 +35,21 @@ testcontainers = "^4.14.2"
 ruff = "^0.15.15"
 mypy = "^2.1.0"
 pre-commit = "^4.6.0"
+httpx = "^0.28.1"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 
 [tool.mypy]
 python_version = "3.14"
-files = ["auth", "core", "infra", "main.py"]
+files = ["auth", "core", "infra", "api", "main.py"]
 exclude = ["migrations/"]
 explicit_package_bases = true
 
 [[tool.mypy.overrides]]
 module = "aioboto3.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "redis.*"
 ignore_missing_imports = true

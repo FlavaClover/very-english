@@ -26,6 +26,9 @@ class InMemoryMedia:
     async def remove(self, name: str) -> None:
         self.removed.append(name)
 
+    async def url(self, name: str) -> str:
+        return f"https://in-memory.test/{name}"
+
 
 @pytest.fixture
 def jwt_issuer() -> JwtIssuer:

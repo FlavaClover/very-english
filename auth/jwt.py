@@ -7,7 +7,7 @@ import jwt
 from auth.exceptions import InvalidTokenError
 from auth.models import UserRole
 
-_ACCESS_TOKEN_TYPE = "access"
+ACCESS_TOKEN_TYPE = "access"
 _REFRESH_TOKEN_TYPE = "refresh"
 
 
@@ -48,7 +48,7 @@ class JwtIssuer:
             "sub": str(user_id),
             "role": role.value,
             "email": email,
-            "type": _ACCESS_TOKEN_TYPE,
+            "type": ACCESS_TOKEN_TYPE,
             "jti": str(uuid4()),
             "iat": now,
             "exp": now + timedelta(minutes=self._expire_minutes),
@@ -115,7 +115,7 @@ class JwtIssuer:
         :raises InvalidTokenError: Если токен недействителен или просрочен.
         """
         payload = self._decode_token(token)
-        if payload.get("type") != _ACCESS_TOKEN_TYPE:
+        if payload.get("type") != ACCESS_TOKEN_TYPE:
             raise InvalidTokenError
 
         sub = payload.get("sub")

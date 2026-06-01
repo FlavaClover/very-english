@@ -218,3 +218,27 @@ class UsersPg(Users):
             return None
 
         return row["tutor_id"]
+
+    async def get_by_tutor_id(self, tutor_id: UUID) -> User | None:
+        result = await self._connection.execute(
+            text(
+                """
+                SELECT
+                    u.id,
+                    u.first_name,
+                    u.last_name,
+                    u.email,
+                    u.role::text AS role,
+                    u.photo
+                FROM users u
+                INNER JOIN users_tutor ut ON ut.user_id = u.id
+                WHERE ut.tutor_id = :tutor_id
+                """
+            ),
+            dict(tutor_id=tutor_id),
+        )
+        row = result.mappings().first()
+        if row is None:
+            return None
+
+        return self._row_to_user(row)

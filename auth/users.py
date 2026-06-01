@@ -51,8 +51,62 @@ class Users(ABC):
     async def get_tutor_id(self, user_id: UUID) -> UUID | None:
         """Возвращает идентификатор профиля тутора, если связь есть."""
 
+    @abstractmethod
+    async def get_by_tutor_id(self, tutor_id: UUID) -> User | None:
+        """Возвращает пользователя, связанного с профилем тутора."""
 
-class UserManager:
+
+class AbstractUserManager(ABC):
+    @abstractmethod
+    async def register(
+        self,
+        first_name: str,
+        last_name: str,
+        email: str,
+        password: str,
+        role: UserRole = UserRole.USER,
+    ) -> User:
+        pass
+
+    @abstractmethod
+    async def login(self, email: str, password: str) -> tuple[User, TokenPair]:
+        pass
+
+    @abstractmethod
+    async def refresh(self, refresh_token: str) -> TokenPair:
+        pass
+
+    @abstractmethod
+    async def get(self, user_id: UUID) -> User:
+        pass
+
+    @abstractmethod
+    async def update(self, user_id: UUID, user: User) -> User:
+        pass
+
+    @abstractmethod
+    async def set_photo(
+        self,
+        user_id: UUID,
+        path: Path | PathLike | str,
+        name: str,
+    ) -> User:
+        pass
+
+    @abstractmethod
+    async def remove_photo(self, user_id: UUID) -> User:
+        pass
+
+    @abstractmethod
+    async def link_tutor_profile(self, user_id: UUID, tutor_id: UUID) -> None:
+        pass
+
+    @abstractmethod
+    async def get_tutor_id(self, user_id: UUID) -> UUID | None:
+        pass
+
+
+class UserManager(AbstractUserManager):
     def __init__(
         self,
         users: Users,

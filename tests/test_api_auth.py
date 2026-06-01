@@ -1,0 +1,54 @@
+from uuid import uuid4
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+
+from api.server import create_server
+
+
+@pytest.fixture
+def api_app(async_engine):
+    database_url = str(async_engine.url)
+    app = create_server(
+        database_url=database_url,
+        jwt_secret_key="test-jwt-secret-key-for-pytest!!",
+        cors_allow_origins=["*"],
+        s3_bucket="test-bucket",
+        aws_endpoint_url="http://localhost:9000",
+    )
+    app.state.db_engine = async_engine
+    return app
+
+
+@pytest.mark.asyncio
+async def test_register_and_login(api_app):
+    transport = ASGITransport(app=api_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        email = f"user-{uuid4()}@example.com"
+        register_response = await client.post(
+            "/auth/register",
+            json={
+                "first_name": "Ivan",
+                "last_name": "Ivanov",
+                "email": email,
+                "password": "secret-password",
+            },
+        )
+        assert register_response.status_code == 200
+        assert register_response.json()["email"] == email
+
+        login_response = await client.post(
+            "/auth/login",
+            json={"email": email, "password": "secret-password"},
+        )
+        assert login_response.status_code == 200
+        tokens = login_response.json()
+        assert "access_token" in tokens
+        assert "refresh_token" in tokens
+
+        me_response = await client.get(
+            "/users/me",
+            headers={"Authorization": f"Bearer {tokens['access_token']}"},
+        )
+        assert me_response.status_code == 200
+        assert me_response.json()["email"] == email

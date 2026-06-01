@@ -108,3 +108,7 @@ async def test_link_tutor(db_connection):
 
     tutor_id = await users.get_tutor_id(created.id)
     assert tutor_id == tutor.id
+
+    linked = await users.get_by_tutor_id(tutor.id)
+    assert linked is not None
+    assert linked.id == created.id

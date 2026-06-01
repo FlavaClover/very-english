@@ -1,0 +1,212 @@
+from dataclasses import dataclass
+
+from auth.models import UserRole
+
+
+@dataclass(frozen=True, slots=True)
+class EndpointAccessRule:
+    """Правило доступа к маршруту FastAPI (по шаблону path из APIRoute)."""
+
+    method: str
+    path: str
+    require_jwt: bool
+    role: UserRole | None = None
+
+
+ENDPOINT_ACCESS_RULES: dict[tuple[str, str], EndpointAccessRule] = {
+    ("POST", "/auth/register"): EndpointAccessRule(
+        method="POST",
+        path="/auth/register",
+        require_jwt=False,
+    ),
+    ("POST", "/auth/register/tutor"): EndpointAccessRule(
+        method="POST",
+        path="/auth/register/tutor",
+        require_jwt=False,
+    ),
+    ("POST", "/auth/login"): EndpointAccessRule(
+        method="POST",
+        path="/auth/login",
+        require_jwt=False,
+    ),
+    ("POST", "/auth/refresh"): EndpointAccessRule(
+        method="POST",
+        path="/auth/refresh",
+        require_jwt=False,
+    ),
+    ("GET", "/users/me"): EndpointAccessRule(
+        method="GET",
+        path="/users/me",
+        require_jwt=True,
+    ),
+    ("PATCH", "/users/me"): EndpointAccessRule(
+        method="PATCH",
+        path="/users/me",
+        require_jwt=True,
+    ),
+    ("GET", "/users/me/photo/url"): EndpointAccessRule(
+        method="GET",
+        path="/users/me/photo/url",
+        require_jwt=True,
+    ),
+    ("POST", "/users/me/photo"): EndpointAccessRule(
+        method="POST",
+        path="/users/me/photo",
+        require_jwt=True,
+    ),
+    ("DELETE", "/users/me/photo"): EndpointAccessRule(
+        method="DELETE",
+        path="/users/me/photo",
+        require_jwt=True,
+    ),
+    ("GET", "/tags"): EndpointAccessRule(
+        method="GET",
+        path="/tags",
+        require_jwt=True,
+    ),
+    ("POST", "/tags"): EndpointAccessRule(
+        method="POST",
+        path="/tags",
+        require_jwt=True,
+        role=UserRole.ADMIN,
+    ),
+    ("DELETE", "/tags/{tag_name}"): EndpointAccessRule(
+        method="DELETE",
+        path="/tags/{tag_name}",
+        require_jwt=True,
+        role=UserRole.ADMIN,
+    ),
+    ("GET", "/tutors"): EndpointAccessRule(
+        method="GET",
+        path="/tutors",
+        require_jwt=False,
+    ),
+    ("GET", "/tutors/{tutor_id}"): EndpointAccessRule(
+        method="GET",
+        path="/tutors/{tutor_id}",
+        require_jwt=False,
+    ),
+    ("GET", "/tutors/{tutor_id}/photo/url"): EndpointAccessRule(
+        method="GET",
+        path="/tutors/{tutor_id}/photo/url",
+        require_jwt=False,
+    ),
+    ("GET", "/tutors/{tutor_id}/visit-video/url"): EndpointAccessRule(
+        method="GET",
+        path="/tutors/{tutor_id}/visit-video/url",
+        require_jwt=False,
+    ),
+    ("GET", "/tutors/{tutor_id}/achievements/urls"): EndpointAccessRule(
+        method="GET",
+        path="/tutors/{tutor_id}/achievements/urls",
+        require_jwt=False,
+    ),
+    ("POST", "/tutors/profile"): EndpointAccessRule(
+        method="POST",
+        path="/tutors/profile",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("GET", "/tutors/me/profile"): EndpointAccessRule(
+        method="GET",
+        path="/tutors/me/profile",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("PATCH", "/tutors/me/profile"): EndpointAccessRule(
+        method="PATCH",
+        path="/tutors/me/profile",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("POST", "/tutors/me/submit-moderation"): EndpointAccessRule(
+        method="POST",
+        path="/tutors/me/submit-moderation",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("POST", "/tutors/me/contacts"): EndpointAccessRule(
+        method="POST",
+        path="/tutors/me/contacts",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("DELETE", "/tutors/me/contacts/{contact_name}"): EndpointAccessRule(
+        method="DELETE",
+        path="/tutors/me/contacts/{contact_name}",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("POST", "/tutors/me/tags/{tag_name}"): EndpointAccessRule(
+        method="POST",
+        path="/tutors/me/tags/{tag_name}",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("DELETE", "/tutors/me/tags/{tag_name}"): EndpointAccessRule(
+        method="DELETE",
+        path="/tutors/me/tags/{tag_name}",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("GET", "/tutors/me/achievements/urls"): EndpointAccessRule(
+        method="GET",
+        path="/tutors/me/achievements/urls",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("POST", "/tutors/me/achievements"): EndpointAccessRule(
+        method="POST",
+        path="/tutors/me/achievements",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("DELETE", "/tutors/me/achievements/{achievement_name}"): EndpointAccessRule(
+        method="DELETE",
+        path="/tutors/me/achievements/{achievement_name}",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("GET", "/tutors/me/visit-video/url"): EndpointAccessRule(
+        method="GET",
+        path="/tutors/me/visit-video/url",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("POST", "/tutors/me/visit-video"): EndpointAccessRule(
+        method="POST",
+        path="/tutors/me/visit-video",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("POST", "/tutors/me/advantage"): EndpointAccessRule(
+        method="POST",
+        path="/tutors/me/advantage",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("DELETE", "/tutors/me/advantage"): EndpointAccessRule(
+        method="DELETE",
+        path="/tutors/me/advantage",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("GET", "/admin/tutors/moderation"): EndpointAccessRule(
+        method="GET",
+        path="/admin/tutors/moderation",
+        require_jwt=True,
+        role=UserRole.ADMIN,
+    ),
+    ("POST", "/admin/tutors/{tutor_id}/approve"): EndpointAccessRule(
+        method="POST",
+        path="/admin/tutors/{tutor_id}/approve",
+        require_jwt=True,
+        role=UserRole.ADMIN,
+    ),
+    ("POST", "/admin/tutors/{tutor_id}/reject"): EndpointAccessRule(
+        method="POST",
+        path="/admin/tutors/{tutor_id}/reject",
+        require_jwt=True,
+        role=UserRole.ADMIN,
+    ),
+}

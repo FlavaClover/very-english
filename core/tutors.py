@@ -1,4 +1,4 @@
-from uuid import UUID
+from uuid import UUID, uuid4
 from os import PathLike
 from pathlib import Path
 from abc import ABC, abstractmethod
@@ -24,6 +24,15 @@ class Media(ABC):
 
     @abstractmethod
     async def remove(self, name: str):
+        pass
+
+    @abstractmethod
+    async def url(self, name: str) -> str:
+        """Возвращает URL для доступа к объекту по ключу в хранилище.
+
+        :param name: Ключ объекта.
+        :return: Временная ссылка на файл.
+        """
         pass
 
 
@@ -239,7 +248,120 @@ class TutorFilter(ABC):
         pass
 
 
-class TutorManager:
+class AbstractTutorManager(ABC):
+    @abstractmethod
+    async def create(
+        self,
+        description: str,
+        cities: list[str],
+        levels: list[Level],
+        price: int,
+        lesson_duration: int,
+        work_format: WorkFormat,
+        contacts: list[Contact],
+        tags: list[Tag],
+    ) -> Tutor:
+        pass
+
+    @abstractmethod
+    async def update(self, tutor_id: UUID, tutor: Tutor) -> Tutor:
+        pass
+
+    @abstractmethod
+    async def set_status(self, tutor_id: UUID, status: TutorStatus) -> Tutor:
+        pass
+
+    @abstractmethod
+    async def get_contacts(self, tutor_id: UUID) -> list[Contact]:
+        pass
+
+    @abstractmethod
+    async def add_contact(self, tutor_id: UUID, name: str, value: str) -> Tutor:
+        pass
+
+    @abstractmethod
+    async def remove_contact(self, tutor_id: UUID, name: str) -> Tutor:
+        pass
+
+    @abstractmethod
+    async def add_achievement(
+        self, tutor_id: UUID, path: Path | PathLike | str, name: str
+    ) -> Achievement:
+        pass
+
+    @abstractmethod
+    async def get_achievements(self, tutor_id: UUID) -> list[Achievement]:
+        pass
+
+    @abstractmethod
+    async def remove_achievement(self, tutor_id: UUID, name: str) -> None:
+        pass
+
+    @abstractmethod
+    async def link_tag_to_tutor(self, tutor_id: UUID, tag_name: str) -> None:
+        pass
+
+    @abstractmethod
+    async def unlink_tag_from_tutor(self, tutor_id: UUID, tag_name: str) -> None:
+        pass
+
+    @abstractmethod
+    async def add_advantage(
+        self,
+        tutor_id: UUID,
+        points: list[Point],
+        video: Path | PathLike | str,
+        name: str,
+    ) -> Advantage:
+        pass
+
+    @abstractmethod
+    async def set_advantage(
+        self,
+        tutor_id: UUID,
+        points: list[Point],
+        video: Path | PathLike | str,
+        name: str,
+    ) -> Advantage:
+        pass
+
+    @abstractmethod
+    async def upload_visit_video(
+        self,
+        tutor_id: UUID,
+        video: Path | PathLike | str,
+        name: str,
+    ) -> Advantage:
+        pass
+
+    @abstractmethod
+    async def get_advantage(self, tutor_id: UUID) -> Advantage:
+        pass
+
+    @abstractmethod
+    async def remove_advantage(self, tutor_id: UUID) -> None:
+        pass
+
+
+class AbstractTagsManager(ABC):
+    @abstractmethod
+    async def add(self, tag_name: str) -> None:
+        pass
+
+    @abstractmethod
+    async def remove(self, tag_name: str) -> None:
+        pass
+
+    @abstractmethod
+    async def get(self, tag_name: str) -> Tag:
+        pass
+
+    @abstractmethod
+    async def get_all(self) -> list[Tag]:
+        pass
+
+
+class TutorManager(AbstractTutorManager):
     def __init__(
         self,
         tutors: Tutors,
@@ -268,7 +390,7 @@ class TutorManager:
         tags: list[Tag],
     ) -> Tutor:
         tutor = Tutor(
-            id=UUID(),
+            id=uuid4(),
             description=description,
             cities=cities,
             levels=levels,
@@ -389,14 +511,51 @@ class TutorManager:
 
         return advantage
 
+    async def set_advantage(
+        self,
+        tutor_id: UUID,
+        points: list[Point],
+        video: Path | PathLike | str,
+        name: str,
+    ) -> Advantage:
+        if await self.advantages.is_exists(tutor_id):
+            existing = await self.get_advantage(tutor_id)
+            await self.media.remove(existing.video)
+            await self.media.add(video, name)
+            return await self.advantages.update(
+                tutor_id,
+                Advantage(points=points, video=name),
+            )
+
+        return await self.add_advantage(tutor_id, points, video, name)
+
+    async def upload_visit_video(
+        self,
+        tutor_id: UUID,
+        video: Path | PathLike | str,
+        name: str,
+    ) -> Advantage:
+        if await self.advantages.is_exists(tutor_id):
+            existing = await self.get_advantage(tutor_id)
+            await self.media.remove(existing.video)
+            await self.media.add(video, name)
+            return await self.advantages.update(
+                tutor_id,
+                Advantage(points=existing.points, video=name),
+            )
+
+        return await self.add_advantage(tutor_id, [], video, name)
+
     async def remove_advantage(self, tutor_id: UUID) -> None:
         if not await self.advantages.is_exists(tutor_id):
             raise ValueError("Advantage does not exist")
 
+        advantage = await self.get_advantage(tutor_id)
+        await self.media.remove(advantage.video)
         await self.advantages.remove(tutor_id)
 
 
-class TagsManager:
+class TagsManager(AbstractTagsManager):
     def __init__(self, tags: Tags):
         self.tags = tags
 
