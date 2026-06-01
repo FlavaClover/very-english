@@ -1,3 +1,11 @@
+x-build-proxy-args: &build-proxy-args
+  HTTP_PROXY: ${HTTP_PROXY:-}
+  HTTPS_PROXY: ${HTTPS_PROXY:-}
+  NO_PROXY: ${NO_PROXY:-}
+  http_proxy: ${http_proxy:-}
+  https_proxy: ${https_proxy:-}
+  no_proxy: ${no_proxy:-}
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -56,7 +64,9 @@ services:
     restart: "no"
 
   migrate:
-    build: .
+    build:
+      context: .
+      args: *build-proxy-args
     command: ["poetry", "run", "alembic", "upgrade", "head"]
     environment:
       DATABASE_URL: postgresql+psycopg://very_english:very_english@postgres:5432/very_english
@@ -66,7 +76,9 @@ services:
     restart: "no"
 
   api:
-    build: .
+    build:
+      context: .
+      args: *build-proxy-args
     ports:
       - "8000:8000"
     environment:
