@@ -13,6 +13,7 @@ class S3Media(Media):
         session: aioboto3.Session,
         bucket: str,
         endpoint_url: str | None = None,
+        public_endpoint_url: str | None = None,
         presigned_expire_seconds: int = 3600,
         redis_client: redis.Redis | None = None,
         url_cache_ttl_seconds: int = 3600,
@@ -21,6 +22,7 @@ class S3Media(Media):
         self._session = session
         self._bucket = bucket
         self._endpoint_url = endpoint_url
+        self._public_endpoint_url = public_endpoint_url or endpoint_url
         self._presigned_expire_seconds = presigned_expire_seconds
         self._redis = redis_client
         self._url_cache_ttl = url_cache_ttl_seconds
@@ -61,14 +63,15 @@ class S3Media(Media):
         return await self._generate_presigned_url(name)
 
     async def _generate_presigned_url(self, name: str) -> str:
-        async with self._client() as client:
+        async with self._client(self._public_endpoint_url) as client:
             return client.generate_presigned_url(
                 ClientMethod="get_object",
                 Params={"Bucket": self._bucket, "Key": name},
                 ExpiresIn=self._presigned_expire_seconds,
             )
 
-    def _client(self):
-        if self._endpoint_url:
-            return self._session.client("s3", endpoint_url=self._endpoint_url)
+    def _client(self, endpoint_url: str | None = None):
+        resolved = self._endpoint_url if endpoint_url is None else endpoint_url
+        if resolved:
+            return self._session.client("s3", endpoint_url=resolved)
         return self._session.client("s3")

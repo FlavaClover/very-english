@@ -48,6 +48,7 @@ def main() -> None:
         aws_secret_access_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
         aws_region = os.environ.get("AWS_REGION", "us-east-1")
         aws_endpoint_url = os.environ.get("AWS_ENDPOINT_URL")
+        aws_public_endpoint_url = os.environ.get("AWS_PUBLIC_ENDPOINT_URL")
         redis_url = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
 
         app = create_server(
@@ -61,6 +62,7 @@ def main() -> None:
             aws_secret_access_key=aws_secret_access_key,
             aws_region=aws_region,
             aws_endpoint_url=aws_endpoint_url,
+            aws_public_endpoint_url=aws_public_endpoint_url,
             redis_url=redis_url,
         )
         uvicorn.run(app, host=api_host, port=api_port)

@@ -41,6 +41,7 @@ def create_server(
     aws_secret_access_key: str | None = None,
     aws_region: str = "us-east-1",
     aws_endpoint_url: str | None = None,
+    aws_public_endpoint_url: str | None = None,
     redis_url: str = "redis://127.0.0.1:6379/0",
 ) -> FastAPI:
     """Собирает FastAPI-приложение с DI, middleware и роутерами."""
@@ -63,11 +64,13 @@ def create_server(
         session_kwargs["aws_secret_access_key"] = aws_secret_access_key
     app.state.s3_session = aioboto3.Session(**session_kwargs)
     app.state.aws_endpoint_url = aws_endpoint_url
+    app.state.aws_public_endpoint_url = aws_public_endpoint_url
     app.state.redis = redis.from_url(redis_url, decode_responses=True)
     app.state.media = S3Media(
         session=app.state.s3_session,
         bucket=s3_bucket,
         endpoint_url=aws_endpoint_url,
+        public_endpoint_url=aws_public_endpoint_url,
         presigned_expire_seconds=MEDIA_URL_CACHE_TTL_SECONDS,
         redis_client=app.state.redis,
         url_cache_ttl_seconds=MEDIA_URL_CACHE_TTL_SECONDS,

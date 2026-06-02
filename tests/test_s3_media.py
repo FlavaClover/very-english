@@ -74,6 +74,42 @@ async def test_s3_media_remove_deletes_object():
 
 
 @pytest.mark.asyncio
+async def test_s3_media_url_uses_public_endpoint_for_presign():
+    internal_client = _s3_client_mock()
+    public_client = _s3_client_mock()
+    public_client.generate_presigned_url = MagicMock(
+        return_value="http://localhost:9000/test-bucket/photo.png?signed=1"
+    )
+    session = MagicMock()
+
+    def client_factory(service_name: str, endpoint_url: str | None = None):
+        if endpoint_url == "http://minio:9000":
+            return internal_client
+        if endpoint_url == "http://localhost:9000":
+            return public_client
+        raise AssertionError(f"unexpected endpoint_url: {endpoint_url!r}")
+
+    session.client.side_effect = client_factory
+
+    media = S3Media(
+        session=session,
+        bucket="test-bucket",
+        endpoint_url="http://minio:9000",
+        public_endpoint_url="http://localhost:9000",
+        presigned_expire_seconds=3600,
+    )
+    url = await media.url("photo.png")
+
+    assert url == "http://localhost:9000/test-bucket/photo.png?signed=1"
+    public_client.generate_presigned_url.assert_called_once_with(
+        ClientMethod="get_object",
+        Params={"Bucket": "test-bucket", "Key": "photo.png"},
+        ExpiresIn=3600,
+    )
+    internal_client.generate_presigned_url.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_s3_media_url_generates_presigned_link():
     client = _s3_client_mock()
     session = MagicMock()
