@@ -8,10 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import NullPool
 from testcontainers.postgres import PostgresContainer
 
+from auth.models import User, UserRole
 from core.models import Contact, Level, Tutor, TutorStatus, WorkFormat
 from infra.contacts import ContactsPg
 from infra.tags import TagsPg
 from infra.tutors import TutorsPg
+from infra.users import UsersPg
 
 
 @pytest.fixture(scope="session")
@@ -54,6 +56,10 @@ def clean_db(engine: Engine) -> None:
             text(
                 """
                 TRUNCATE TABLE
+                    tutor_subscription_history,
+                    tutor_subscriptions,
+                    payments,
+                    subscription_plans,
                     users_tutor,
                     users,
                     points,
@@ -65,6 +71,17 @@ def clean_db(engine: Engine) -> None:
                     tags,
                     tutors
                 RESTART IDENTITY CASCADE
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO subscription_plans (id, price_rub, billing_interval)
+                VALUES
+                    ('base', 990, 'month'),
+                    ('pro', 1990, 'month')
+                ON CONFLICT (id) DO NOTHING
                 """
             )
         )
@@ -127,3 +144,20 @@ async def seed_tutor(
         await tags.link_tag_to_tutor(created.id, tag_name)
 
     return await tutors.get(created.id)
+
+
+async def seed_tutor_user(
+    db_connection,
+    autopayment_consent: bool = False,
+) -> User:
+    """Создаёт пользователя с ролью tutor для тестов подписок."""
+    users = UsersPg(db_connection)
+    user = User(
+        id=uuid4(),
+        first_name="Tutor",
+        last_name="User",
+        email=f"tutor-{uuid4()}@example.com",
+        role=UserRole.TUTOR,
+        autopayment_consent=autopayment_consent,
+    )
+    return await users.create(user, "hash")

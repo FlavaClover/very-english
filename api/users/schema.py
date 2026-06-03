@@ -10,6 +10,11 @@ class UserResponse(BaseModel):
     email: str
     role: str
     photo: str | None = None
+    autopayment_consent: bool = False
+
+
+class AutopaymentConsentRequest(BaseModel):
+    consent: bool
 
 
 class UserRegisterRequest(BaseModel):

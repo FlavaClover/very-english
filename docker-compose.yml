@@ -14,7 +14,7 @@ services:
       POSTGRES_PASSWORD: very_english
       POSTGRES_DB: very_english
     ports:
-      - "5432:5432"
+      - "5437:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -93,6 +93,8 @@ services:
       API_HOST: 0.0.0.0
       API_PORT: "8000"
       REDIS_URL: redis://redis:6379/0
+      YOOKASSA_SHOP_ID: ${YOOKASSA_SHOP_ID:-}
+      YOOKASSA_SECRET_KEY: ${YOOKASSA_SECRET_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -100,6 +102,40 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  billing-renew:
+    build:
+      context: .
+      args: *build-proxy-args
+    command: ["poetry", "run", "python", "main.py", "billing-renew"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://very_english:very_english@postgres:5432/very_english
+      YOOKASSA_SHOP_ID: ${YOOKASSA_SHOP_ID:-}
+      YOOKASSA_SECRET_KEY: ${YOOKASSA_SECRET_KEY:-}
+      BILLING_RENEW_INTERVAL_SECONDS: "3600"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  billing-sync-payments:
+    build:
+      context: .
+      args: *build-proxy-args
+    command: ["poetry", "run", "python", "main.py", "billing-sync-payments"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://very_english:very_english@postgres:5432/very_english
+      YOOKASSA_SHOP_ID: ${YOOKASSA_SHOP_ID:-}
+      YOOKASSA_SECRET_KEY: ${YOOKASSA_SECRET_KEY:-}
+      BILLING_SYNC_INTERVAL_SECONDS: "300"
+    depends_on:
+      postgres:
+        condition: service_healthy
       migrate:
         condition: service_completed_successfully
     restart: unless-stopped

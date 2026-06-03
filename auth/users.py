@@ -55,6 +55,10 @@ class Users(ABC):
     async def get_by_tutor_id(self, tutor_id: UUID) -> User | None:
         """Возвращает пользователя, связанного с профилем тутора."""
 
+    @abstractmethod
+    async def set_autopayment_consent(self, user_id: UUID, consent: bool) -> User:
+        """Обновляет согласие пользователя на автоплатежи."""
+
 
 class AbstractUserManager(ABC):
     @abstractmethod
@@ -103,6 +107,10 @@ class AbstractUserManager(ABC):
 
     @abstractmethod
     async def get_tutor_id(self, user_id: UUID) -> UUID | None:
+        pass
+
+    @abstractmethod
+    async def set_autopayment_consent(self, user_id: UUID, consent: bool) -> User:
         pass
 
 
@@ -244,3 +252,7 @@ class UserManager(AbstractUserManager):
     async def get_tutor_id(self, user_id: UUID) -> UUID | None:
         """Возвращает идентификатор профиля тутора пользователя."""
         return await self._users.get_tutor_id(user_id)
+
+    async def set_autopayment_consent(self, user_id: UUID, consent: bool) -> User:
+        """Обновляет согласие тутора на автоплатежи."""
+        return await self._users.set_autopayment_consent(user_id, consent)

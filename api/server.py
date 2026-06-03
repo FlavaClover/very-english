@@ -1,3 +1,6 @@
+import aiohttp
+from contextlib import asynccontextmanager
+
 import aioboto3
 import redis.asyncio as redis
 from fastapi import FastAPI
@@ -8,26 +11,29 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from api.access_policy import ENDPOINT_ACCESS_RULES
 from api.admin.endpoints import router as admin_router
 from api.auth.endpoints import router as auth_router
+from api.billing.webhook import router as billing_router
 from api.catalog.endpoints import router as catalog_router
 from api.dependencies import (
     MEDIA_URL_CACHE_TTL_SECONDS,
     get_media,
+    get_subscription_service,
     get_tags_manager,
     get_tutor_filter,
     get_tutor_manager,
     get_user_manager,
     get_users,
 )
-from auth.users import Users
-from core.tutors import Media
-from infra.s3_media import S3Media
-from api.middlewares import JwtAccessMiddleware
+from api.middlewares import JwtAccessMiddleware, SubscriptionAccessMiddleware
+from api.subscriptions.endpoints import router as subscriptions_router
 from api.tags.endpoints import router as tags_router
 from api.tutors.endpoints import router as tutors_router
 from api.users.endpoints import router as users_router
 from auth.jwt import JwtIssuer
-from auth.users import AbstractUserManager
-from core.tutors import AbstractTagsManager, AbstractTutorManager, TutorFilter
+from auth.users import AbstractUserManager, Users
+from billing.yookassa_client import YooKassaClient
+from core.subscriptions import AbstractSubscriptionService
+from core.tutors import AbstractTagsManager, AbstractTutorManager, Media, TutorFilter
+from infra.s3_media import S3Media
 
 
 def create_server(
@@ -35,6 +41,8 @@ def create_server(
     jwt_secret_key: str,
     cors_allow_origins: list[str],
     s3_bucket: str,
+    yookassa_shop_id: str,
+    yookassa_secret_key: str,
     jwt_expire_minutes: int = 60,
     jwt_refresh_expire_days: int = 7,
     aws_access_key_id: str | None = None,
@@ -45,13 +53,29 @@ def create_server(
     redis_url: str = "redis://127.0.0.1:6379/0",
 ) -> FastAPI:
     """Собирает FastAPI-приложение с DI, middleware и роутерами."""
-    app = FastAPI(title="Very English API", version="0.1.0")
-
-    app.state.db_engine = create_async_engine(
+    db_engine = create_async_engine(
         database_url,
         pool_pre_ping=True,
         pool_recycle=1800,
     )
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        http_session = aiohttp.ClientSession()
+        app.state.yookassa_http_session = http_session
+        app.state.yookassa_client = YooKassaClient(
+            http_session,
+            yookassa_shop_id,
+            yookassa_secret_key,
+        )
+        yield
+        await http_session.close()
+        await db_engine.dispose()
+
+    app = FastAPI(title="Very English API", version="0.1.0", lifespan=lifespan)
+
+    app.state.db_engine = db_engine
+    app.state.cors_allow_origins = cors_allow_origins
     app.state.jwt_issuer = JwtIssuer(
         secret_key=jwt_secret_key,
         expire_minutes=jwt_expire_minutes,
@@ -83,6 +107,7 @@ def create_server(
         allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         allow_headers=["*"],
     )
+    app.add_middleware(SubscriptionAccessMiddleware, db_engine=db_engine)
     app.add_middleware(JwtAccessMiddleware, jwt_secret=jwt_secret_key)
 
     app.include_router(auth_router)
@@ -91,6 +116,8 @@ def create_server(
     app.include_router(catalog_router)
     app.include_router(tutors_router)
     app.include_router(admin_router)
+    app.include_router(subscriptions_router)
+    app.include_router(billing_router)
 
     app.dependency_overrides[Media] = get_media
     app.dependency_overrides[Users] = get_users
@@ -98,6 +125,7 @@ def create_server(
     app.dependency_overrides[AbstractTutorManager] = get_tutor_manager
     app.dependency_overrides[AbstractTagsManager] = get_tags_manager
     app.dependency_overrides[TutorFilter] = get_tutor_filter
+    app.dependency_overrides[AbstractSubscriptionService] = get_subscription_service
 
     def custom_openapi():
         if app.openapi_schema is not None:

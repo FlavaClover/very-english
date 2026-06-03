@@ -19,7 +19,8 @@ dependencies = [
     "bcrypt (>=5.0.0,<6.0.0)",
     "uvicorn (>=0.40.0,<0.41.0)",
     "python-multipart (>=0.0.22,<0.0.23)",
-    "redis (>=5.0.0,<9.0.0)"
+    "redis (>=5.0.0,<9.0.0)",
+    "aiohttp (>=3.11.0,<4.0.0)"
 ]
 
 
@@ -42,7 +43,7 @@ asyncio_mode = "auto"
 
 [tool.mypy]
 python_version = "3.14"
-files = ["auth", "core", "infra", "api", "main.py"]
+files = ["auth", "core", "infra", "api", "billing", "broker", "services", "main.py"]
 exclude = ["migrations/"]
 explicit_package_bases = true
 
@@ -52,4 +53,8 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "redis.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "aiohttp.*"
 ignore_missing_imports = true

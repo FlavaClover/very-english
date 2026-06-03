@@ -16,10 +16,8 @@ from auth.exceptions import (
     UserAlreadyExistsError,
     UserNotFoundError,
 )
+from auth.models import UserRole
 from auth.users import AbstractUserManager
-from api.tutors.schema import TutorRegisterRequest
-from core.models import Contact, Level, Tag, WorkFormat
-from core.tutors import AbstractTutorManager
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -61,15 +59,12 @@ async def register_user(
     "/register/tutor",
     response_model=UserResponse,
     responses={400: {"model": ErrorResponse}},
-    summary="Регистрация тутора с профилем",
+    summary="Регистрация тутора",
 )
 async def register_tutor(
-    payload: TutorRegisterRequest,
+    payload: UserRegisterRequest,
     user_manager: Annotated[AbstractUserManager, Depends()],
-    tutor_manager: Annotated[AbstractTutorManager, Depends()],
 ) -> UserResponse | Response:
-    from auth.models import UserRole
-
     try:
         user = await user_manager.register(
             first_name=payload.first_name,
@@ -78,27 +73,7 @@ async def register_tutor(
             password=payload.password,
             role=UserRole.TUTOR,
         )
-        tutor = await tutor_manager.create(
-            description=payload.description,
-            cities=payload.cities,
-            levels=[Level(level) for level in payload.levels],
-            price=payload.price,
-            lesson_duration=payload.lesson_duration,
-            work_format=WorkFormat(payload.work_format),
-            contacts=[
-                Contact(name=contact.name, value=contact.value)
-                for contact in payload.contacts
-            ],
-            tags=[Tag(name=name) for name in payload.tags],
-        )
-        await user_manager.link_tutor_profile(user.id, tutor.id)
     except UserAlreadyExistsError as exc:
-        return Response(
-            content=ErrorResponse(detail=str(exc)).model_dump_json(),
-            status_code=400,
-            media_type="application/json",
-        )
-    except ValueError as exc:
         return Response(
             content=ErrorResponse(detail=str(exc)).model_dump_json(),
             status_code=400,

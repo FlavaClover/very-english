@@ -20,6 +20,7 @@ class UsersPg(Users):
             email=row["email"],
             role=UserRole(str(row["role"])),
             photo=row["photo"],
+            autopayment_consent=bool(row["autopayment_consent"]),
         )
 
     async def create(self, user: User, password_hash: str) -> User:
@@ -33,7 +34,8 @@ class UsersPg(Users):
                     last_name,
                     email,
                     password_hash,
-                    role
+                    role,
+                    autopayment_consent
                 )
                 VALUES (
                     :id,
@@ -42,7 +44,8 @@ class UsersPg(Users):
                     :last_name,
                     :email,
                     :password_hash,
-                    CAST(:role AS user_role)
+                    CAST(:role AS user_role),
+                    :autopayment_consent
                 )
                 """
             ),
@@ -54,6 +57,7 @@ class UsersPg(Users):
                 email=user.email,
                 password_hash=password_hash,
                 role=user.role.value,
+                autopayment_consent=user.autopayment_consent,
             ),
         )
         return user
@@ -68,7 +72,8 @@ class UsersPg(Users):
                     first_name,
                     last_name,
                     email,
-                    role::text AS role
+                    role::text AS role,
+                    autopayment_consent
                 FROM users
                 WHERE id = :user_id
                 """
@@ -91,7 +96,8 @@ class UsersPg(Users):
                     first_name,
                     last_name,
                     email,
-                    role::text AS role
+                    role::text AS role,
+                    autopayment_consent
                 FROM users
                 WHERE email = :email
                 """
@@ -152,7 +158,36 @@ class UsersPg(Users):
             email=user.email,
             role=user.role,
             photo=user.photo,
+            autopayment_consent=user.autopayment_consent,
         )
+
+    async def set_autopayment_consent(
+        self,
+        user_id: UUID,
+        consent: bool,
+    ) -> User:
+        result = await self._connection.execute(
+            text(
+                """
+                UPDATE users
+                SET autopayment_consent = :consent
+                WHERE id = :user_id
+                RETURNING
+                    id,
+                    photo,
+                    first_name,
+                    last_name,
+                    email,
+                    role::text AS role,
+                    autopayment_consent
+                """
+            ),
+            dict(user_id=user_id, consent=consent),
+        )
+        row = result.mappings().first()
+        if row is None:
+            raise UserNotFoundError
+        return self._row_to_user(row)
 
     async def set_photo(self, user_id: UUID, photo: str | None) -> User:
         result = await self._connection.execute(
@@ -167,7 +202,8 @@ class UsersPg(Users):
                     first_name,
                     last_name,
                     email,
-                    role::text AS role
+                    role::text AS role,
+                    autopayment_consent
                 """
             ),
             dict(user_id=user_id, photo=photo),
@@ -229,7 +265,8 @@ class UsersPg(Users):
                     u.last_name,
                     u.email,
                     u.role::text AS role,
-                    u.photo
+                    u.photo,
+                    u.autopayment_consent
                 FROM users u
                 INNER JOIN users_tutor ut ON ut.user_id = u.id
                 WHERE ut.tutor_id = :tutor_id

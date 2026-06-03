@@ -6,6 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 from auth.jwt import JwtIssuer
 from auth.passwords import BcryptPasswordHasher, PasswordHasher
 from auth.users import AbstractUserManager, UserManager, Users
+from billing.yookassa_client import YooKassaClient
+from core.subscriptions import AbstractSubscriptionService
+from infra.payments import PaymentsPg
 from infra.users import UsersPg
 from core.tutors import (
     AbstractTagsManager,
@@ -19,8 +22,10 @@ from infra.achievements import AchievementsPg
 from infra.advantages import AdvantagesPg
 from infra.contacts import ContactsPg
 from infra.tags import TagsPg
+from infra.subscriptions import SubscriptionsPg
 from infra.tutor_filter import TutorFilterPg
 from infra.tutors import TutorsPg
+from services.subscription_service import SubscriptionService
 
 MEDIA_URL_CACHE_TTL_SECONDS = 3600
 
@@ -105,3 +110,18 @@ async def get_users(
     conn: AsyncConnection = Depends(get_connection),
 ) -> Users:
     return UsersPg(conn)
+
+
+def get_yookassa_client(request: Request) -> YooKassaClient:
+    return request.app.state.yookassa_client
+
+
+async def get_subscription_service(
+    conn: AsyncConnection = Depends(get_connection),
+    gateway: YooKassaClient = Depends(get_yookassa_client),
+) -> AbstractSubscriptionService:
+    return SubscriptionService(
+        payments=PaymentsPg(conn),
+        subscriptions=SubscriptionsPg(conn),
+        gateway=gateway,
+    )

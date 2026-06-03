@@ -17,3 +17,4 @@ class User:
     email: str
     role: UserRole
     photo: str | None = None
+    autopayment_consent: bool = False

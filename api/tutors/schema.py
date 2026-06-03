@@ -77,21 +77,6 @@ class TutorProfileUpdateRequest(BaseModel):
     work_format: str
 
 
-class TutorRegisterRequest(BaseModel):
-    first_name: str = Field(min_length=1)
-    last_name: str = Field(min_length=1)
-    email: str = Field(min_length=3)
-    password: str = Field(min_length=8)
-    description: str = Field(min_length=1)
-    cities: list[str] = Field(min_length=1)
-    levels: list[str] = Field(min_length=1)
-    price: int = Field(gt=0)
-    lesson_duration: int = Field(gt=0)
-    work_format: str
-    contacts: list[ContactRequest] = Field(min_length=1)
-    tags: list[str] = Field(min_length=1)
-
-
 class TutorListQuery(BaseModel):
     price_from: int | None = None
     price_to: int | None = None

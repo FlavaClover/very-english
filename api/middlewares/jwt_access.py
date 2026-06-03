@@ -5,11 +5,9 @@ from uuid import UUID
 import jwt
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from fastapi.routing import APIRoute
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.routing import Match
 
-from api.access_policy import ENDPOINT_ACCESS_RULES
+from api.middlewares.route_access import resolve_endpoint_access_rule
 from auth.context import AuthContext
 from auth.errors import AccessDeniedError
 from auth.jwt import ACCESS_TOKEN_TYPE
@@ -27,12 +25,7 @@ class JwtAccessMiddleware(BaseHTTPMiddleware):
         if request.method == "OPTIONS":
             return await call_next(request)
 
-        route_path = self._resolve_route_path(request)
-        rule = (
-            ENDPOINT_ACCESS_RULES.get((request.method.upper(), route_path))
-            if route_path is not None
-            else None
-        )
+        rule = resolve_endpoint_access_rule(request)
         if rule is None:
             return await call_next(request)
         if not rule.require_jwt:
@@ -51,15 +44,6 @@ class JwtAccessMiddleware(BaseHTTPMiddleware):
         request.state.auth_context = context
         request.state.user_id = context.user_id
         return await call_next(request)
-
-    def _resolve_route_path(self, request: Request) -> str | None:
-        for route in request.app.router.routes:
-            if not isinstance(route, APIRoute):
-                continue
-            match, _ = route.matches(request.scope)
-            if match == Match.FULL:
-                return route.path
-        return None
 
     def _build_context(self, request: Request) -> AuthContext:
         header_value = request.headers.get("Authorization")

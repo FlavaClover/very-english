@@ -15,6 +15,8 @@ def api_app(async_engine):
         cors_allow_origins=["*"],
         s3_bucket="test-bucket",
         aws_endpoint_url="http://localhost:9000",
+        yookassa_shop_id="test-shop",
+        yookassa_secret_key="test-secret",
     )
     app.state.db_engine = async_engine
     return app
@@ -52,3 +54,30 @@ async def test_register_and_login(api_app):
         )
         assert me_response.status_code == 200
         assert me_response.json()["email"] == email
+
+
+@pytest.mark.asyncio
+async def test_register_tutor_minimal(api_app):
+    transport = ASGITransport(app=api_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        email = f"tutor-{uuid4()}@example.com"
+        register_response = await client.post(
+            "/auth/register/tutor",
+            json={
+                "first_name": "Anna",
+                "last_name": "Petrova",
+                "email": email,
+                "password": "secret-password",
+            },
+        )
+        assert register_response.status_code == 200
+        body = register_response.json()
+        assert body["email"] == email
+        assert body["role"] == "tutor"
+
+        login_response = await client.post(
+            "/auth/login",
+            json={"email": email, "password": "secret-password"},
+        )
+        assert login_response.status_code == 200
+        assert "access_token" in login_response.json()

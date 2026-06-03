@@ -20,6 +20,8 @@ def api_app(async_engine):
         cors_allow_origins=["*"],
         s3_bucket="test-bucket",
         aws_endpoint_url="http://localhost:9000",
+        yookassa_shop_id="test-shop",
+        yookassa_secret_key="test-secret",
     )
     app.state.db_engine = async_engine
     app.state.media = InMemoryMedia()

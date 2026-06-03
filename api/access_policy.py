@@ -1,6 +1,14 @@
 from dataclasses import dataclass
+from enum import Enum
 
 from auth.models import UserRole
+
+
+class RequiredSubscription(Enum):
+    """Минимальный тариф подписки для доступа к маршруту."""
+
+    BASE = "base"
+    PRO = "pro"
 
 
 @dataclass(frozen=True, slots=True)
@@ -11,6 +19,7 @@ class EndpointAccessRule:
     path: str
     require_jwt: bool
     role: UserRole | None = None
+    required_subscription: RequiredSubscription | None = None
 
 
 ENDPOINT_ACCESS_RULES: dict[tuple[str, str], EndpointAccessRule] = {
@@ -58,6 +67,59 @@ ENDPOINT_ACCESS_RULES: dict[tuple[str, str], EndpointAccessRule] = {
         method="DELETE",
         path="/users/me/photo",
         require_jwt=True,
+    ),
+    ("PATCH", "/users/me/autopayment-consent"): EndpointAccessRule(
+        method="PATCH",
+        path="/users/me/autopayment-consent",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("GET", "/subscriptions/plans"): EndpointAccessRule(
+        method="GET",
+        path="/subscriptions/plans",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("GET", "/subscriptions/me"): EndpointAccessRule(
+        method="GET",
+        path="/subscriptions/me",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("GET", "/subscriptions/me/history"): EndpointAccessRule(
+        method="GET",
+        path="/subscriptions/me/history",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("GET", "/subscriptions/me/payments"): EndpointAccessRule(
+        method="GET",
+        path="/subscriptions/me/payments",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("POST", "/subscriptions/checkout"): EndpointAccessRule(
+        method="POST",
+        path="/subscriptions/checkout",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("POST", "/subscriptions/upgrade"): EndpointAccessRule(
+        method="POST",
+        path="/subscriptions/upgrade",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("GET", "/subscriptions/me/upgrade/quote"): EndpointAccessRule(
+        method="GET",
+        path="/subscriptions/me/upgrade/quote",
+        require_jwt=True,
+        role=UserRole.TUTOR,
+    ),
+    ("POST", "/billing/webhooks/yookassa"): EndpointAccessRule(
+        method="POST",
+        path="/billing/webhooks/yookassa",
+        require_jwt=False,
     ),
     ("GET", "/tags"): EndpointAccessRule(
         method="GET",
@@ -118,36 +180,42 @@ ENDPOINT_ACCESS_RULES: dict[tuple[str, str], EndpointAccessRule] = {
         path="/tutors/me/profile",
         require_jwt=True,
         role=UserRole.TUTOR,
+        required_subscription=RequiredSubscription.BASE,
     ),
     ("POST", "/tutors/me/submit-moderation"): EndpointAccessRule(
         method="POST",
         path="/tutors/me/submit-moderation",
         require_jwt=True,
         role=UserRole.TUTOR,
+        required_subscription=RequiredSubscription.BASE,
     ),
     ("POST", "/tutors/me/contacts"): EndpointAccessRule(
         method="POST",
         path="/tutors/me/contacts",
         require_jwt=True,
         role=UserRole.TUTOR,
+        required_subscription=RequiredSubscription.BASE,
     ),
     ("DELETE", "/tutors/me/contacts/{contact_name}"): EndpointAccessRule(
         method="DELETE",
         path="/tutors/me/contacts/{contact_name}",
         require_jwt=True,
         role=UserRole.TUTOR,
+        required_subscription=RequiredSubscription.BASE,
     ),
     ("POST", "/tutors/me/tags/{tag_name}"): EndpointAccessRule(
         method="POST",
         path="/tutors/me/tags/{tag_name}",
         require_jwt=True,
         role=UserRole.TUTOR,
+        required_subscription=RequiredSubscription.BASE,
     ),
     ("DELETE", "/tutors/me/tags/{tag_name}"): EndpointAccessRule(
         method="DELETE",
         path="/tutors/me/tags/{tag_name}",
         require_jwt=True,
         role=UserRole.TUTOR,
+        required_subscription=RequiredSubscription.BASE,
     ),
     ("GET", "/tutors/me/achievements/urls"): EndpointAccessRule(
         method="GET",
@@ -160,36 +228,42 @@ ENDPOINT_ACCESS_RULES: dict[tuple[str, str], EndpointAccessRule] = {
         path="/tutors/me/achievements",
         require_jwt=True,
         role=UserRole.TUTOR,
+        required_subscription=RequiredSubscription.BASE,
     ),
     ("DELETE", "/tutors/me/achievements/{achievement_name}"): EndpointAccessRule(
         method="DELETE",
         path="/tutors/me/achievements/{achievement_name}",
         require_jwt=True,
         role=UserRole.TUTOR,
+        required_subscription=RequiredSubscription.BASE,
     ),
     ("GET", "/tutors/me/visit-video/url"): EndpointAccessRule(
         method="GET",
         path="/tutors/me/visit-video/url",
         require_jwt=True,
         role=UserRole.TUTOR,
+        required_subscription=RequiredSubscription.PRO,
     ),
     ("POST", "/tutors/me/visit-video"): EndpointAccessRule(
         method="POST",
         path="/tutors/me/visit-video",
         require_jwt=True,
         role=UserRole.TUTOR,
+        required_subscription=RequiredSubscription.PRO,
     ),
     ("POST", "/tutors/me/advantage"): EndpointAccessRule(
         method="POST",
         path="/tutors/me/advantage",
         require_jwt=True,
         role=UserRole.TUTOR,
+        required_subscription=RequiredSubscription.PRO,
     ),
     ("DELETE", "/tutors/me/advantage"): EndpointAccessRule(
         method="DELETE",
         path="/tutors/me/advantage",
         require_jwt=True,
         role=UserRole.TUTOR,
+        required_subscription=RequiredSubscription.PRO,
     ),
     ("GET", "/admin/tutors/moderation"): EndpointAccessRule(
         method="GET",

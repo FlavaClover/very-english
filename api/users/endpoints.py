@@ -5,7 +5,12 @@ from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
 
 from api.schema import ErrorResponse
 from api.upload import save_upload_to_temp
-from api.users.schema import MediaUrlResponse, UserResponse, UserUpdateRequest
+from api.users.schema import (
+    AutopaymentConsentRequest,
+    MediaUrlResponse,
+    UserResponse,
+    UserUpdateRequest,
+)
 from auth.exceptions import UserNotFoundError
 from auth.models import User
 from auth.users import AbstractUserManager
@@ -39,6 +44,7 @@ async def get_me(
         email=user.email,
         role=user.role.value,
         photo=user.photo,
+        autopayment_consent=user.autopayment_consent,
     )
 
 
@@ -64,6 +70,7 @@ async def update_me(
                 email=payload.email,
                 role=current.role,
                 photo=current.photo,
+                autopayment_consent=current.autopayment_consent,
             ),
         )
     except UserNotFoundError as exc:
@@ -79,6 +86,40 @@ async def update_me(
         email=updated.email,
         role=updated.role.value,
         photo=updated.photo,
+        autopayment_consent=updated.autopayment_consent,
+    )
+
+
+@router.patch(
+    "/me/autopayment-consent",
+    response_model=UserResponse,
+    responses={404: {"model": ErrorResponse}},
+    summary="Согласие на автоплатежи",
+)
+async def update_autopayment_consent(
+    request: Request,
+    payload: AutopaymentConsentRequest,
+    user_manager: Annotated[AbstractUserManager, Depends()],
+) -> UserResponse | Response:
+    try:
+        user = await user_manager.set_autopayment_consent(
+            request.state.user_id,
+            payload.consent,
+        )
+    except UserNotFoundError as exc:
+        return Response(
+            content=ErrorResponse(detail=str(exc)).model_dump_json(),
+            status_code=404,
+            media_type="application/json",
+        )
+    return UserResponse(
+        id=user.id,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        email=user.email,
+        role=user.role.value,
+        photo=user.photo,
+        autopayment_consent=user.autopayment_consent,
     )
 
 
@@ -145,6 +186,7 @@ async def upload_photo(
         email=user.email,
         role=user.role.value,
         photo=user.photo,
+        autopayment_consent=user.autopayment_consent,
     )
 
 
@@ -173,4 +215,5 @@ async def delete_photo(
         email=user.email,
         role=user.role.value,
         photo=user.photo,
+        autopayment_consent=user.autopayment_consent,
     )

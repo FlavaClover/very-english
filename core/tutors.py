@@ -417,7 +417,8 @@ class TutorManager(AbstractTutorManager):
         if len(tags) == 0:
             raise ValueError("Tags cannot be empty")
 
-        if len(contacts) != len(set(contacts)):
+        contact_names = [contact.name for contact in contacts]
+        if len(contact_names) != len(set(contact_names)):
             raise ValueError("Contacts must be unique")
 
         tutor = await self.tutors.create(tutor)
