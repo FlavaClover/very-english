@@ -53,11 +53,6 @@ ENDPOINT_ACCESS_RULES: dict[tuple[str, str], EndpointAccessRule] = {
         path="/users/me",
         require_jwt=True,
     ),
-    ("GET", "/users/me/photo/url"): EndpointAccessRule(
-        method="GET",
-        path="/users/me/photo/url",
-        require_jwt=True,
-    ),
     ("POST", "/users/me/photo"): EndpointAccessRule(
         method="POST",
         path="/users/me/photo",
@@ -217,12 +212,6 @@ ENDPOINT_ACCESS_RULES: dict[tuple[str, str], EndpointAccessRule] = {
         role=UserRole.TUTOR,
         required_subscription=RequiredSubscription.BASE,
     ),
-    ("GET", "/tutors/me/achievements/urls"): EndpointAccessRule(
-        method="GET",
-        path="/tutors/me/achievements/urls",
-        require_jwt=True,
-        role=UserRole.TUTOR,
-    ),
     ("POST", "/tutors/me/achievements"): EndpointAccessRule(
         method="POST",
         path="/tutors/me/achievements",
@@ -236,13 +225,6 @@ ENDPOINT_ACCESS_RULES: dict[tuple[str, str], EndpointAccessRule] = {
         require_jwt=True,
         role=UserRole.TUTOR,
         required_subscription=RequiredSubscription.BASE,
-    ),
-    ("GET", "/tutors/me/visit-video/url"): EndpointAccessRule(
-        method="GET",
-        path="/tutors/me/visit-video/url",
-        require_jwt=True,
-        role=UserRole.TUTOR,
-        required_subscription=RequiredSubscription.PRO,
     ),
     ("POST", "/tutors/me/visit-video"): EndpointAccessRule(
         method="POST",

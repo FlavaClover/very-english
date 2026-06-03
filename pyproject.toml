@@ -20,9 +20,12 @@ dependencies = [
     "uvicorn (>=0.40.0,<0.41.0)",
     "python-multipart (>=0.0.22,<0.0.23)",
     "redis (>=5.0.0,<9.0.0)",
-    "aiohttp (>=3.11.0,<4.0.0)"
+    "aiohttp (>=3.11.0,<4.0.0)",
 ]
 
+
+[tool.poetry.scripts]
+generate-data = "generation.cli:main"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
@@ -37,6 +40,8 @@ ruff = "^0.15.15"
 mypy = "^2.1.0"
 pre-commit = "^4.6.0"
 httpx = "^0.28.1"
+mimesis = "^19.1.0"
+rich = "^15.0.0"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

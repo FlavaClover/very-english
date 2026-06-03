@@ -17,11 +17,9 @@ from api.schema import ErrorResponse
 from api.upload import save_upload_to_temp
 from api.tutors.schema import (
     AchievementResponse,
-    AchievementUrlItemResponse,
     AdvantageResponse,
     ContactRequest,
     ContactResponse,
-    MediaUrlResponse,
     PointResponse,
     TagResponse,
     TutorProfileCreateRequest,
@@ -116,6 +114,7 @@ async def get_my_profile(
     request: Request,
     user_manager: Annotated[AbstractUserManager, Depends()],
     tutor_filter: Annotated[TutorFilter, Depends()],
+    media: Annotated[Media, Depends()],
 ) -> TutorProfileResponse | Response:
     tutor_id = await _get_linked_tutor_id(request, user_manager)
     if isinstance(tutor_id, Response):
@@ -128,6 +127,17 @@ async def get_my_profile(
             status_code=404,
             media_type="application/json",
         )
+    achievements: list[AchievementResponse] = []
+    for achievement in profile.achievements:
+        achievements.append(
+            AchievementResponse(
+                image=achievement.image,
+                url=await media.url(achievement.image),
+            )
+        )
+    video_url = None
+    if profile.advantage.video:
+        video_url = await media.url(profile.advantage.video)
     return TutorProfileResponse(
         id=profile.id,
         description=profile.description,
@@ -137,12 +147,10 @@ async def get_my_profile(
         lesson_duration=profile.lesson_duration,
         work_format=profile.work_format.value,
         status=profile.status.value,
-        achievements=[
-            AchievementResponse(image=achievement.image)
-            for achievement in profile.achievements
-        ],
+        achievements=achievements,
         advantage=AdvantageResponse(
             video=profile.advantage.video,
+            video_url=video_url,
             points=[
                 PointResponse(text=point.text) for point in profile.advantage.points
             ],
@@ -344,33 +352,6 @@ async def unlink_tag(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.get(
-    "/me/achievements/urls",
-    response_model=list[AchievementUrlItemResponse],
-    responses={404: {"model": ErrorResponse}},
-    summary="Ссылки на изображения достижений",
-)
-async def get_achievement_urls(
-    request: Request,
-    user_manager: Annotated[AbstractUserManager, Depends()],
-    tutor_manager: Annotated[AbstractTutorManager, Depends()],
-    media: Annotated[Media, Depends()],
-) -> list[AchievementUrlItemResponse] | Response:
-    tutor_id = await _get_linked_tutor_id(request, user_manager)
-    if isinstance(tutor_id, Response):
-        return tutor_id
-    achievements = await tutor_manager.get_achievements(tutor_id)
-    items: list[AchievementUrlItemResponse] = []
-    for achievement in achievements:
-        items.append(
-            AchievementUrlItemResponse(
-                image=achievement.image,
-                url=await media.url(achievement.image),
-            )
-        )
-    return items
-
-
 @router.post(
     "/me/achievements",
     response_model=dict,
@@ -423,39 +404,6 @@ async def delete_achievement(
         await tutor_manager.remove_achievement(tutor_id, achievement_name)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@router.get(
-    "/me/visit-video/url",
-    response_model=MediaUrlResponse,
-    responses={404: {"model": ErrorResponse}},
-    summary="Ссылка на видео-визитку",
-)
-async def get_visit_video_url(
-    request: Request,
-    user_manager: Annotated[AbstractUserManager, Depends()],
-    tutor_manager: Annotated[AbstractTutorManager, Depends()],
-    media: Annotated[Media, Depends()],
-) -> MediaUrlResponse | Response:
-    tutor_id = await _get_linked_tutor_id(request, user_manager)
-    if isinstance(tutor_id, Response):
-        return tutor_id
-    try:
-        advantage = await tutor_manager.get_advantage(tutor_id)
-    except ValueError as exc:
-        return Response(
-            content=ErrorResponse(detail=str(exc)).model_dump_json(),
-            status_code=404,
-            media_type="application/json",
-        )
-    if not advantage.video:
-        return Response(
-            content=ErrorResponse(detail="Visit video is not set").model_dump_json(),
-            status_code=404,
-            media_type="application/json",
-        )
-    url = await media.url(advantage.video)
-    return MediaUrlResponse(url=url)
 
 
 @router.post(

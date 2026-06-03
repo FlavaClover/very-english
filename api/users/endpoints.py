@@ -7,7 +7,6 @@ from api.schema import ErrorResponse
 from api.upload import save_upload_to_temp
 from api.users.schema import (
     AutopaymentConsentRequest,
-    MediaUrlResponse,
     UserResponse,
     UserUpdateRequest,
 )
@@ -19,6 +18,19 @@ from core.tutors import Media
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
+async def _build_user_response(user: User, media: Media) -> UserResponse:
+    photo = await media.url(user.photo) if user.photo else None
+    return UserResponse(
+        id=user.id,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        email=user.email,
+        role=user.role.value,
+        photo=photo,
+        autopayment_consent=user.autopayment_consent,
+    )
+
+
 @router.get(
     "/me",
     response_model=UserResponse,
@@ -28,6 +40,7 @@ router = APIRouter(prefix="/users", tags=["Users"])
 async def get_me(
     request: Request,
     user_manager: Annotated[AbstractUserManager, Depends()],
+    media: Annotated[Media, Depends()],
 ) -> UserResponse | Response:
     try:
         user = await user_manager.get(request.state.user_id)
@@ -37,15 +50,7 @@ async def get_me(
             status_code=404,
             media_type="application/json",
         )
-    return UserResponse(
-        id=user.id,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        email=user.email,
-        role=user.role.value,
-        photo=user.photo,
-        autopayment_consent=user.autopayment_consent,
-    )
+    return await _build_user_response(user, media)
 
 
 @router.patch(
@@ -58,6 +63,7 @@ async def update_me(
     request: Request,
     payload: UserUpdateRequest,
     user_manager: Annotated[AbstractUserManager, Depends()],
+    media: Annotated[Media, Depends()],
 ) -> UserResponse | Response:
     try:
         current = await user_manager.get(request.state.user_id)
@@ -79,15 +85,7 @@ async def update_me(
             status_code=404,
             media_type="application/json",
         )
-    return UserResponse(
-        id=updated.id,
-        first_name=updated.first_name,
-        last_name=updated.last_name,
-        email=updated.email,
-        role=updated.role.value,
-        photo=updated.photo,
-        autopayment_consent=updated.autopayment_consent,
-    )
+    return await _build_user_response(updated, media)
 
 
 @router.patch(
@@ -100,6 +98,7 @@ async def update_autopayment_consent(
     request: Request,
     payload: AutopaymentConsentRequest,
     user_manager: Annotated[AbstractUserManager, Depends()],
+    media: Annotated[Media, Depends()],
 ) -> UserResponse | Response:
     try:
         user = await user_manager.set_autopayment_consent(
@@ -112,44 +111,7 @@ async def update_autopayment_consent(
             status_code=404,
             media_type="application/json",
         )
-    return UserResponse(
-        id=user.id,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        email=user.email,
-        role=user.role.value,
-        photo=user.photo,
-        autopayment_consent=user.autopayment_consent,
-    )
-
-
-@router.get(
-    "/me/photo/url",
-    response_model=MediaUrlResponse,
-    responses={404: {"model": ErrorResponse}},
-    summary="Ссылка на аватар текущего пользователя",
-)
-async def get_my_photo_url(
-    request: Request,
-    user_manager: Annotated[AbstractUserManager, Depends()],
-    media: Annotated[Media, Depends()],
-) -> MediaUrlResponse | Response:
-    try:
-        user = await user_manager.get(request.state.user_id)
-    except UserNotFoundError as exc:
-        return Response(
-            content=ErrorResponse(detail=str(exc)).model_dump_json(),
-            status_code=404,
-            media_type="application/json",
-        )
-    if user.photo is None:
-        return Response(
-            content=ErrorResponse(detail="Photo is not set").model_dump_json(),
-            status_code=404,
-            media_type="application/json",
-        )
-    url = await media.url(user.photo)
-    return MediaUrlResponse(url=url)
+    return await _build_user_response(user, media)
 
 
 @router.post(
@@ -161,6 +123,7 @@ async def get_my_photo_url(
 async def upload_photo(
     request: Request,
     user_manager: Annotated[AbstractUserManager, Depends()],
+    media: Annotated[Media, Depends()],
     file: UploadFile = File(...),
 ) -> UserResponse | Response:
     temp_path = await save_upload_to_temp(file)
@@ -179,15 +142,7 @@ async def upload_photo(
         )
     finally:
         temp_path.unlink(missing_ok=True)
-    return UserResponse(
-        id=user.id,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        email=user.email,
-        role=user.role.value,
-        photo=user.photo,
-        autopayment_consent=user.autopayment_consent,
-    )
+    return await _build_user_response(user, media)
 
 
 @router.delete(
@@ -199,6 +154,7 @@ async def upload_photo(
 async def delete_photo(
     request: Request,
     user_manager: Annotated[AbstractUserManager, Depends()],
+    media: Annotated[Media, Depends()],
 ) -> UserResponse | Response:
     try:
         user = await user_manager.remove_photo(request.state.user_id)
@@ -208,12 +164,4 @@ async def delete_photo(
             status_code=404,
             media_type="application/json",
         )
-    return UserResponse(
-        id=user.id,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        email=user.email,
-        role=user.role.value,
-        photo=user.photo,
-        autopayment_consent=user.autopayment_consent,
-    )
+    return await _build_user_response(user, media)

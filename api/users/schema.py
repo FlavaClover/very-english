@@ -38,10 +38,6 @@ class TokenPairResponse(BaseModel):
     refresh_token: str
 
 
-class MediaUrlResponse(BaseModel):
-    url: str
-
-
 class UserUpdateRequest(BaseModel):
     first_name: str = Field(min_length=1)
     last_name: str = Field(min_length=1)

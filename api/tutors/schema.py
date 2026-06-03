@@ -19,6 +19,7 @@ class TagResponse(BaseModel):
 
 class AchievementResponse(BaseModel):
     image: str
+    url: str | None = None
 
 
 class MediaUrlResponse(BaseModel):
@@ -36,6 +37,7 @@ class PointResponse(BaseModel):
 
 class AdvantageResponse(BaseModel):
     video: str
+    video_url: str | None = None
     points: list[PointResponse]
 
 
