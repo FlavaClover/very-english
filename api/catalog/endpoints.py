@@ -1,46 +1,25 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 
 from api.schema import ErrorResponse
 from api.tutors.schema import (
     AchievementResponse,
-    AchievementUrlItemResponse,
     AdvantageResponse,
     ContactResponse,
-    MediaUrlResponse,
     PointResponse,
     TagResponse,
     TutorProfileResponse,
 )
 from auth.users import Users
 from core.exceptions import TutorNotFoundError
-from core.models import Level, Tag, TutorProfile, TutorStatus, WorkFormat
+from core.models import Level, Tag, WorkFormat
+from services.subscription import AbstractSubscriptionService
+from services.views import AbstractTutorProfileViewService
 from core.tutors import Media, TutorFilter
 
 router = APIRouter(prefix="/tutors", tags=["Catalog"])
-
-
-async def _load_approved_profile(
-    tutor_id: UUID,
-    tutor_filter: TutorFilter,
-) -> TutorProfile | Response:
-    try:
-        profile = await tutor_filter.get(tutor_id)
-    except TutorNotFoundError as exc:
-        return Response(
-            content=ErrorResponse(detail=str(exc)).model_dump_json(),
-            status_code=404,
-            media_type="application/json",
-        )
-    if profile.status is not TutorStatus.APPROVED:
-        return Response(
-            content=ErrorResponse(detail="Tutor not found").model_dump_json(),
-            status_code=404,
-            media_type="application/json",
-        )
-    return profile
 
 
 @router.get(
@@ -50,12 +29,16 @@ async def _load_approved_profile(
 )
 async def list_tutors(
     tutor_filter: Annotated[TutorFilter, Depends()],
+    users: Annotated[Users, Depends()],
+    media: Annotated[Media, Depends()],
+    subscription_service: Annotated[AbstractSubscriptionService, Depends()],
     price_from: int | None = Query(default=None, ge=0),
     price_to: int | None = Query(default=None, ge=0),
     levels: list[str] | None = Query(default=None),
     work_formats: list[str] | None = Query(default=None),
     cities: list[str] | None = Query(default=None),
     tags: list[str] | None = Query(default=None),
+    pro_only: bool = Query(default=False),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=10, ge=1, le=100),
 ) -> list[TutorProfileResponse]:
@@ -71,37 +54,65 @@ async def list_tutors(
         work_formats=parsed_formats,
         cities=cities,
         tags=parsed_tags,
+        pro_only=pro_only,
         page=page,
         page_size=page_size,
     )
-    return [
-        TutorProfileResponse(
-            id=profile.id,
-            description=profile.description,
-            cities=profile.cities,
-            levels=[level.value for level in profile.levels],
-            price=profile.price,
-            lesson_duration=profile.lesson_duration,
-            work_format=profile.work_format.value,
-            status=profile.status.value,
-            achievements=[
-                AchievementResponse(image=achievement.image)
-                for achievement in profile.achievements
-            ],
-            advantage=AdvantageResponse(
-                video=profile.advantage.video,
-                points=[
-                    PointResponse(text=point.text) for point in profile.advantage.points
+    result: list[TutorProfileResponse] = []
+    for profile in profiles:
+        user = await users.get_by_tutor_id(profile.id)
+        photo_key = user.photo if user is not None else None
+        subscription_plan = None
+        if user is not None:
+            subscription_plan = await subscription_service.resolve_subscription_plan(
+                user.id,
+            )
+        achievements: list[AchievementResponse] = []
+        for achievement in profile.achievements:
+            achievement_url = None
+            if achievement.image:
+                achievement_url = await media.url(achievement.image)
+            achievements.append(
+                AchievementResponse(
+                    image=achievement.image,
+                    url=achievement_url,
+                )
+            )
+        video_url = None
+        if profile.advantage.video:
+            video_url = await media.url(profile.advantage.video)
+        photo_url = None
+        if photo_key:
+            photo_url = await media.url(photo_key)
+        result.append(
+            TutorProfileResponse(
+                id=profile.id,
+                description=profile.description,
+                cities=profile.cities,
+                levels=[level.value for level in profile.levels],
+                price=profile.price,
+                lesson_duration=profile.lesson_duration,
+                work_format=profile.work_format.value,
+                status=profile.status.value,
+                photo_url=photo_url,
+                subscription_plan=subscription_plan,
+                achievements=achievements,
+                advantage=AdvantageResponse(
+                    video=profile.advantage.video,
+                    video_url=video_url,
+                    points=[
+                        PointResponse(text=point.text)
+                        for point in profile.advantage.points
+                    ],
+                ),
+                contacts=[
+                    ContactResponse(name=contact.name, value=contact.value)
+                    for contact in profile.contacts
                 ],
-            ),
-            contacts=[
-                ContactResponse(name=contact.name, value=contact.value)
-                for contact in profile.contacts
-            ],
-            tags=[TagResponse(name=tag.name) for tag in profile.tags],
+                tags=[TagResponse(name=tag.name) for tag in profile.tags],
+            )
         )
-        for profile in profiles
-    ]
+    return result
 
 
 @router.get(
@@ -111,8 +122,13 @@ async def list_tutors(
     summary="Профиль тутора (каталог)",
 )
 async def get_tutor(
+    request: Request,
     tutor_id: UUID,
     tutor_filter: Annotated[TutorFilter, Depends()],
+    users: Annotated[Users, Depends()],
+    media: Annotated[Media, Depends()],
+    subscription_service: Annotated[AbstractSubscriptionService, Depends()],
+    profile_views: Annotated[AbstractTutorProfileViewService, Depends()],
 ) -> TutorProfileResponse | Response:
     try:
         profile = await tutor_filter.get(tutor_id)
@@ -122,6 +138,31 @@ async def get_tutor(
             status_code=404,
             media_type="application/json",
         )
+    await profile_views.record_view(request.state.user_id, tutor_id)
+    user = await users.get_by_tutor_id(tutor_id)
+    photo_key = user.photo if user is not None else None
+    subscription_plan = None
+    if user is not None:
+        subscription_plan = await subscription_service.resolve_subscription_plan(
+            user.id,
+        )
+    achievements: list[AchievementResponse] = []
+    for achievement in profile.achievements:
+        achievement_url = None
+        if achievement.image:
+            achievement_url = await media.url(achievement.image)
+        achievements.append(
+            AchievementResponse(
+                image=achievement.image,
+                url=achievement_url,
+            )
+        )
+    video_url = None
+    if profile.advantage.video:
+        video_url = await media.url(profile.advantage.video)
+    photo_url = None
+    if photo_key:
+        photo_url = await media.url(photo_key)
     return TutorProfileResponse(
         id=profile.id,
         description=profile.description,
@@ -131,12 +172,12 @@ async def get_tutor(
         lesson_duration=profile.lesson_duration,
         work_format=profile.work_format.value,
         status=profile.status.value,
-        achievements=[
-            AchievementResponse(image=achievement.image)
-            for achievement in profile.achievements
-        ],
+        photo_url=photo_url,
+        subscription_plan=subscription_plan,
+        achievements=achievements,
         advantage=AdvantageResponse(
             video=profile.advantage.video,
+            video_url=video_url,
             points=[
                 PointResponse(text=point.text) for point in profile.advantage.points
             ],
@@ -147,78 +188,3 @@ async def get_tutor(
         ],
         tags=[TagResponse(name=tag.name) for tag in profile.tags],
     )
-
-
-@router.get(
-    "/{tutor_id}/photo/url",
-    response_model=MediaUrlResponse,
-    responses={404: {"model": ErrorResponse}},
-    summary="Ссылка на аватар тутора (каталог)",
-)
-async def get_tutor_photo_url(
-    tutor_id: UUID,
-    tutor_filter: Annotated[TutorFilter, Depends()],
-    users: Annotated[Users, Depends()],
-    media: Annotated[Media, Depends()],
-) -> MediaUrlResponse | Response:
-    profile = await _load_approved_profile(tutor_id, tutor_filter)
-    if isinstance(profile, Response):
-        return profile
-    user = await users.get_by_tutor_id(tutor_id)
-    if user is None or user.photo is None:
-        return Response(
-            content=ErrorResponse(detail="Photo is not set").model_dump_json(),
-            status_code=404,
-            media_type="application/json",
-        )
-    url = await media.url(user.photo)
-    return MediaUrlResponse(url=url)
-
-
-@router.get(
-    "/{tutor_id}/visit-video/url",
-    response_model=MediaUrlResponse,
-    responses={404: {"model": ErrorResponse}},
-    summary="Ссылка на видео-визитку тутора (каталог)",
-)
-async def get_tutor_visit_video_url(
-    tutor_id: UUID,
-    tutor_filter: Annotated[TutorFilter, Depends()],
-    media: Annotated[Media, Depends()],
-) -> MediaUrlResponse | Response:
-    profile = await _load_approved_profile(tutor_id, tutor_filter)
-    if isinstance(profile, Response):
-        return profile
-    if not profile.advantage.video:
-        return Response(
-            content=ErrorResponse(detail="Visit video is not set").model_dump_json(),
-            status_code=404,
-            media_type="application/json",
-        )
-    url = await media.url(profile.advantage.video)
-    return MediaUrlResponse(url=url)
-
-
-@router.get(
-    "/{tutor_id}/achievements/urls",
-    response_model=list[AchievementUrlItemResponse],
-    responses={404: {"model": ErrorResponse}},
-    summary="Ссылки на достижения тутора (каталог)",
-)
-async def get_tutor_achievement_urls(
-    tutor_id: UUID,
-    tutor_filter: Annotated[TutorFilter, Depends()],
-    media: Annotated[Media, Depends()],
-) -> list[AchievementUrlItemResponse] | Response:
-    profile = await _load_approved_profile(tutor_id, tutor_filter)
-    if isinstance(profile, Response):
-        return profile
-    items: list[AchievementUrlItemResponse] = []
-    for achievement in profile.achievements:
-        items.append(
-            AchievementUrlItemResponse(
-                image=achievement.image,
-                url=await media.url(achievement.image),
-            )
-        )
-    return items

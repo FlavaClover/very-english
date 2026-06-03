@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 
 from api.schema import ErrorResponse
 from api.tags.schema import TagCreateRequest, TagResponse
-from core.tutors import AbstractTagsManager
+from services.tags import AbstractTagsManager
 
 router = APIRouter(prefix="/tags", tags=["Tags"])
 

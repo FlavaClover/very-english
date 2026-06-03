@@ -2,7 +2,7 @@ from uuid import uuid4
 
 import pytest
 
-from core.subscriptions import (
+from billing.subscriptions import (
     PaymentEventType,
     PaymentRecord,
     PaymentStatus,
@@ -12,7 +12,7 @@ from core.subscriptions import (
 )
 from infra.payments import PaymentsPg
 from infra.subscriptions import SubscriptionsPg
-from services.subscription_service import SubscriptionService
+from services.subscription import SubscriptionService
 from tests.conftest import seed_tutor_user
 
 

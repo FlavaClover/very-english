@@ -29,8 +29,10 @@ from api.tutors.schema import (
 )
 from auth.users import AbstractUserManager
 from core.exceptions import TutorNotFoundError
+from services.subscription import AbstractSubscriptionService
 from core.models import Contact, Level, Point, Tag, Tutor, TutorStatus, WorkFormat
-from core.tutors import AbstractTutorManager, Media, TutorFilter
+from core.tutors import Media, TutorFilter
+from services.tutors import AbstractTutorManager
 
 router = APIRouter(prefix="/tutors", tags=["Tutors"])
 
@@ -115,6 +117,7 @@ async def get_my_profile(
     user_manager: Annotated[AbstractUserManager, Depends()],
     tutor_filter: Annotated[TutorFilter, Depends()],
     media: Annotated[Media, Depends()],
+    subscription_service: Annotated[AbstractSubscriptionService, Depends()],
 ) -> TutorProfileResponse | Response:
     tutor_id = await _get_linked_tutor_id(request, user_manager)
     if isinstance(tutor_id, Response):
@@ -127,17 +130,27 @@ async def get_my_profile(
             status_code=404,
             media_type="application/json",
         )
+    user = await user_manager.get(request.state.user_id)
+    subscription_plan = await subscription_service.resolve_subscription_plan(
+        request.state.user_id,
+    )
     achievements: list[AchievementResponse] = []
     for achievement in profile.achievements:
+        achievement_url = None
+        if achievement.image:
+            achievement_url = await media.url(achievement.image)
         achievements.append(
             AchievementResponse(
                 image=achievement.image,
-                url=await media.url(achievement.image),
+                url=achievement_url,
             )
         )
     video_url = None
     if profile.advantage.video:
         video_url = await media.url(profile.advantage.video)
+    photo_url = None
+    if user.photo:
+        photo_url = await media.url(user.photo)
     return TutorProfileResponse(
         id=profile.id,
         description=profile.description,
@@ -147,6 +160,8 @@ async def get_my_profile(
         lesson_duration=profile.lesson_duration,
         work_format=profile.work_format.value,
         status=profile.status.value,
+        photo_url=photo_url,
+        subscription_plan=subscription_plan,
         achievements=achievements,
         advantage=AdvantageResponse(
             video=profile.advantage.video,
@@ -189,6 +204,8 @@ async def update_my_profile(
             work_format=WorkFormat(payload.work_format),
         )
         tutor = await tutor_manager.update(tutor_id, updated)
+
+        await tutor_manager.set_status(tutor_id, TutorStatus.DRAFT)
     except (TutorNotFoundError, ValueError) as exc:
         status = 404 if isinstance(exc, TutorNotFoundError) else 400
         return Response(
@@ -429,6 +446,8 @@ async def upload_visit_video(
             temp_path,
             object_name,
         )
+
+        await tutor_manager.set_status(tutor_id, TutorStatus.DRAFT)
     except ValueError as exc:
         return Response(
             content=ErrorResponse(detail=str(exc)).model_dump_json(),

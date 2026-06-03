@@ -3,7 +3,7 @@ from uuid import uuid4
 
 import pytest
 
-from core.subscriptions import (
+from billing.subscriptions import (
     PaymentEventType,
     PaymentRecord,
     PaymentStatus,

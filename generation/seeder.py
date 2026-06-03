@@ -11,7 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from auth.models import UserRole
 from auth.passwords import BcryptPasswordHasher
 from core.models import Achievement, Advantage, Point
-from core.subscriptions import SubscriptionPlanId, SubscriptionStatus, UserSubscription
+from billing.subscriptions import (
+    SubscriptionPlanId,
+    SubscriptionStatus,
+    UserSubscription,
+)
 from generation.config import GenerationConfig
 from generation.fixtures import ProfileFixtures
 from generation.media_storage import GenerationMediaStorage

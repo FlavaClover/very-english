@@ -5,6 +5,14 @@ from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
 
 from api.schema import ErrorResponse
 from api.upload import save_upload_to_temp
+from api.tutors.schema import (
+    AchievementResponse,
+    AdvantageResponse,
+    ContactResponse,
+    PointResponse,
+    TagResponse,
+    TutorProfileResponse,
+)
 from api.users.schema import (
     AutopaymentConsentRequest,
     UserResponse,
@@ -12,7 +20,9 @@ from api.users.schema import (
 )
 from auth.exceptions import UserNotFoundError
 from auth.models import User
-from auth.users import AbstractUserManager
+from auth.users import AbstractUserManager, Users
+from services.subscription import AbstractSubscriptionService
+from services.views import AbstractTutorProfileViewService
 from core.tutors import Media
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -165,3 +175,76 @@ async def delete_photo(
             media_type="application/json",
         )
     return await _build_user_response(user, media)
+
+
+@router.get(
+    "/me/recent-tutor-profiles",
+    response_model=list[TutorProfileResponse],
+    summary="Последние просмотренные профили туторов",
+)
+async def get_recent_tutor_profiles(
+    request: Request,
+    profile_views: Annotated[AbstractTutorProfileViewService, Depends()],
+    users: Annotated[Users, Depends()],
+    media: Annotated[Media, Depends()],
+    subscription_service: Annotated[AbstractSubscriptionService, Depends()],
+) -> list[TutorProfileResponse]:
+    profiles = await profile_views.list_recent_profiles(
+        request.state.user_id,
+        limit=3,
+    )
+    result: list[TutorProfileResponse] = []
+    for profile in profiles:
+        user = await users.get_by_tutor_id(profile.id)
+        photo_key = user.photo if user is not None else None
+        subscription_plan = None
+        if user is not None:
+            subscription_plan = await subscription_service.resolve_subscription_plan(
+                user.id,
+            )
+        achievements: list[AchievementResponse] = []
+        for achievement in profile.achievements:
+            achievement_url = None
+            if achievement.image:
+                achievement_url = await media.url(achievement.image)
+            achievements.append(
+                AchievementResponse(
+                    image=achievement.image,
+                    url=achievement_url,
+                )
+            )
+        video_url = None
+        if profile.advantage.video:
+            video_url = await media.url(profile.advantage.video)
+        photo_url = None
+        if photo_key:
+            photo_url = await media.url(photo_key)
+        result.append(
+            TutorProfileResponse(
+                id=profile.id,
+                description=profile.description,
+                cities=profile.cities,
+                levels=[level.value for level in profile.levels],
+                price=profile.price,
+                lesson_duration=profile.lesson_duration,
+                work_format=profile.work_format.value,
+                status=profile.status.value,
+                photo_url=photo_url,
+                subscription_plan=subscription_plan,
+                achievements=achievements,
+                advantage=AdvantageResponse(
+                    video=profile.advantage.video,
+                    video_url=video_url,
+                    points=[
+                        PointResponse(text=point.text)
+                        for point in profile.advantage.points
+                    ],
+                ),
+                contacts=[
+                    ContactResponse(name=contact.name, value=contact.value)
+                    for contact in profile.contacts
+                ],
+                tags=[TagResponse(name=tag.name) for tag in profile.tags],
+            )
+        )
+    return result

@@ -14,8 +14,9 @@ from api.subscriptions.schema import (
     UpgradeRequest,
     UserSubscriptionResponse,
 )
-from core.subscriptions import AbstractSubscriptionService, SubscriptionPlanId
-from services.subscription_service import (
+from billing.subscriptions import SubscriptionPlanId
+from services.subscription import AbstractSubscriptionService
+from services.subscription import (
     InvalidPlanError,
     InvalidSubscriptionStateError,
     SubscriptionNotFoundError,
@@ -42,7 +43,7 @@ async def list_plans(
     plans = await subscription_service.list_plans()
     return [
         SubscriptionPlanResponse(
-            id=plan.id.value,
+            id=plan.id,
             price_rub=plan.price_rub,
             billing_interval=plan.billing_interval,
         )
@@ -71,12 +72,11 @@ async def get_my_subscription(
         )
     return UserSubscriptionResponse(
         user_id=subscription.user_id,
-        plan_id=subscription.plan_id.value,
+        plan_id=subscription.plan_id,
         status=subscription.status.value,
         period_start=subscription.period_start,
         period_end=subscription.period_end,
         paid_at=subscription.paid_at,
-        yookassa_payment_method_id=subscription.yookassa_payment_method_id,
     )
 
 
@@ -100,7 +100,7 @@ async def get_my_history(
         SubscriptionHistoryItemResponse(
             id=item.id,
             payment_id=item.payment_id,
-            plan_id=item.plan_id.value,
+            plan_id=item.plan_id,
             event_type=item.event_type.value,
             period_start=item.period_start,
             period_end=item.period_end,
@@ -131,7 +131,7 @@ async def get_my_payments(
     return [
         PaymentResponse(
             id=payment.id,
-            plan_id=payment.plan_id.value,
+            plan_id=payment.plan_id,
             event_type=payment.event_type.value,
             amount_rub=payment.amount_rub,
             status=payment.status.value,

@@ -48,6 +48,11 @@ ENDPOINT_ACCESS_RULES: dict[tuple[str, str], EndpointAccessRule] = {
         path="/users/me",
         require_jwt=True,
     ),
+    ("GET", "/users/me/recent-tutor-profiles"): EndpointAccessRule(
+        method="GET",
+        path="/users/me/recent-tutor-profiles",
+        require_jwt=True,
+    ),
     ("PATCH", "/users/me"): EndpointAccessRule(
         method="PATCH",
         path="/users/me",
@@ -136,27 +141,12 @@ ENDPOINT_ACCESS_RULES: dict[tuple[str, str], EndpointAccessRule] = {
     ("GET", "/tutors"): EndpointAccessRule(
         method="GET",
         path="/tutors",
-        require_jwt=False,
+        require_jwt=True,
     ),
     ("GET", "/tutors/{tutor_id}"): EndpointAccessRule(
         method="GET",
         path="/tutors/{tutor_id}",
-        require_jwt=False,
-    ),
-    ("GET", "/tutors/{tutor_id}/photo/url"): EndpointAccessRule(
-        method="GET",
-        path="/tutors/{tutor_id}/photo/url",
-        require_jwt=False,
-    ),
-    ("GET", "/tutors/{tutor_id}/visit-video/url"): EndpointAccessRule(
-        method="GET",
-        path="/tutors/{tutor_id}/visit-video/url",
-        require_jwt=False,
-    ),
-    ("GET", "/tutors/{tutor_id}/achievements/urls"): EndpointAccessRule(
-        method="GET",
-        path="/tutors/{tutor_id}/achievements/urls",
-        require_jwt=False,
+        require_jwt=True,
     ),
     ("POST", "/tutors/profile"): EndpointAccessRule(
         method="POST",

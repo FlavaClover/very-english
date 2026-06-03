@@ -2,10 +2,14 @@ from datetime import UTC, datetime
 
 import pytest
 
-from core.subscriptions import SubscriptionPlanId, SubscriptionStatus, UserSubscription
+from billing.subscriptions import (
+    SubscriptionPlanId,
+    SubscriptionStatus,
+    UserSubscription,
+)
 from infra.payments import PaymentsPg
 from infra.subscriptions import SubscriptionsPg
-from services.subscription_service import (
+from services.subscription import (
     InvalidSubscriptionStateError,
     SubscriptionService,
 )

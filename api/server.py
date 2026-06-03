@@ -20,6 +20,7 @@ from api.dependencies import (
     get_tags_manager,
     get_tutor_filter,
     get_tutor_manager,
+    get_view_service,
     get_user_manager,
     get_users,
 )
@@ -34,8 +35,11 @@ from auth.jwt import JwtIssuer
 from auth.users import AbstractUserManager, Users
 from billing.yookassa_client import YooKassaClient
 from billing.yookassa_webhook_ip import YooKassaWebhookIpValidator
-from core.subscriptions import AbstractSubscriptionService
-from core.tutors import AbstractTagsManager, AbstractTutorManager, Media, TutorFilter
+from services.subscription import AbstractSubscriptionService
+from services.views import AbstractTutorProfileViewService
+from core.tutors import Media, TutorFilter
+from services.tags import AbstractTagsManager
+from services.tutors import AbstractTutorManager
 from infra.s3_media import S3Media
 
 
@@ -135,6 +139,7 @@ def create_server(
     app.dependency_overrides[AbstractTagsManager] = get_tags_manager
     app.dependency_overrides[TutorFilter] = get_tutor_filter
     app.dependency_overrides[AbstractSubscriptionService] = get_subscription_service
+    app.dependency_overrides[AbstractTutorProfileViewService] = get_view_service
 
     def custom_openapi():
         if app.openapi_schema is not None:

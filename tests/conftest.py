@@ -56,6 +56,7 @@ def clean_db(engine: Engine) -> None:
             text(
                 """
                 TRUNCATE TABLE
+                    tutor_profile_views,
                     tutor_subscription_history,
                     tutor_subscriptions,
                     payments,

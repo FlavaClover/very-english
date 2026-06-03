@@ -15,6 +15,7 @@ from core.models import (
     TutorStatus,
     WorkFormat,
 )
+from billing.subscriptions import SubscriptionPlanId, SubscriptionStatus
 from core.tutors import TutorFilter
 
 
@@ -30,6 +31,7 @@ class TutorFilterPg(TutorFilter):
         work_formats: list[WorkFormat] | None = None,
         cities: list[str] | None = None,
         tags: list[Tag] | None = None,
+        pro_only: bool = False,
         page: int = 1,
         page_size: int = 10,
     ) -> list[TutorProfile]:
@@ -76,6 +78,35 @@ class TutorFilterPg(TutorFilter):
             )
             params["tag_names"] = [tag.name for tag in tags]
             params["tags_count"] = len(tags)
+
+        if pro_only:
+            conditions.append(
+                """
+                EXISTS (
+                    SELECT 1
+                    FROM users_tutor ut
+                    INNER JOIN tutor_subscriptions ts ON ts.user_id = ut.user_id
+                    WHERE ut.tutor_id = t.id
+                      AND ts.plan_id = CAST(:pro_plan AS subscription_plan)
+                      AND ts.status = CAST(:active_status AS subscription_status)
+                )
+                """
+            )
+            params["pro_plan"] = SubscriptionPlanId.PRO.value
+            params["active_status"] = SubscriptionStatus.ACTIVE.value
+        else:
+            conditions.append(
+                """
+                EXISTS (
+                    SELECT 1
+                    FROM users_tutor ut
+                    INNER JOIN tutor_subscriptions ts ON ts.user_id = ut.user_id
+                    WHERE ut.tutor_id = t.id
+                      AND ts.status = CAST(:active_status AS subscription_status)
+                )
+                """
+            )
+            params["active_status"] = SubscriptionStatus.ACTIVE.value
 
         where_clause = " AND ".join(conditions)
         result = await self._connection.execute(

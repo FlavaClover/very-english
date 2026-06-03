@@ -1,11 +1,11 @@
 import calendar
 import logging
 import math
+from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from core.subscriptions import (
-    AbstractSubscriptionService,
+from billing.subscriptions import (
     CheckoutResult,
     PaymentEventType,
     PaymentGateway,
@@ -13,6 +13,7 @@ from core.subscriptions import (
     PaymentRepository,
     PaymentStatus,
     SubscriptionPeriodHistory,
+    SubscriptionPlan,
     SubscriptionPlanId,
     SubscriptionRepository,
     SubscriptionStatus,
@@ -37,6 +38,70 @@ class InvalidSubscriptionStateError(Exception):
     """Операция недоступна в текущем состоянии подписки."""
 
 
+class AbstractSubscriptionService(ABC):
+    @abstractmethod
+    async def list_plans(self) -> list[SubscriptionPlan]:
+        """Возвращает все тарифные планы."""
+
+    @abstractmethod
+    async def get_active_subscription(self, user_id: UUID) -> UserSubscription | None:
+        """Возвращает текущую подписку пользователя-тутора."""
+
+    @abstractmethod
+    async def resolve_subscription_plan(
+        self, user_id: UUID
+    ) -> SubscriptionPlanId | None:
+        """Возвращает план подписки для отображения в профиле тутора."""
+
+    @abstractmethod
+    async def list_history(
+        self,
+        user_id: UUID,
+        limit: int,
+        offset: int,
+    ) -> list[SubscriptionPeriodHistory]:
+        """Возвращает историю периодов подписки."""
+
+    @abstractmethod
+    async def list_payments(
+        self,
+        user_id: UUID,
+        limit: int,
+        offset: int,
+    ) -> list[PaymentRecord]:
+        """Возвращает платежи пользователя-тутора."""
+
+    @abstractmethod
+    async def checkout(
+        self,
+        user_id: UUID,
+        plan_id: SubscriptionPlanId,
+        return_url: str,
+    ) -> CheckoutResult:
+        """Создаёт платёж для оформления подписки."""
+
+    @abstractmethod
+    async def upgrade(
+        self,
+        user_id: UUID,
+        return_url: str,
+        now: datetime | None = None,
+    ) -> CheckoutResult:
+        """Создаёт платёж для апгрейда BASE → PRO."""
+
+    @abstractmethod
+    async def get_upgrade_quote(
+        self,
+        user_id: UUID,
+        now: datetime | None = None,
+    ) -> UpgradeQuote:
+        """Возвращает сумму доплаты за апгрейд BASE → PRO."""
+
+    @abstractmethod
+    async def handle_webhook(self, payload: dict) -> None:
+        """Обрабатывает webhook-уведомление ЮKassa."""
+
+
 class SubscriptionService(AbstractSubscriptionService):
     def __init__(
         self,
@@ -53,6 +118,19 @@ class SubscriptionService(AbstractSubscriptionService):
 
     async def get_active_subscription(self, user_id: UUID) -> UserSubscription | None:
         return await self._subscriptions.get_active(user_id)
+
+    async def resolve_subscription_plan(
+        self, user_id: UUID
+    ) -> SubscriptionPlanId | None:
+        subscription = await self.get_active_subscription(user_id)
+        if subscription is None:
+            return None
+        if subscription.status in (
+            SubscriptionStatus.ACTIVE,
+            SubscriptionStatus.PAST_DUE,
+        ):
+            return subscription.plan_id
+        return None
 
     async def list_history(self, user_id: UUID, limit: int, offset: int):
         return await self._subscriptions.list_history(user_id, limit, offset)

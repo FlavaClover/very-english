@@ -2,6 +2,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from billing.subscriptions import SubscriptionPlanId
+
 
 class ContactRequest(BaseModel):
     name: str = Field(min_length=1)
@@ -53,6 +55,8 @@ class TutorResponse(BaseModel):
 
 class TutorProfileResponse(TutorResponse):
     status: str
+    photo_url: str | None = None
+    subscription_plan: SubscriptionPlanId | None = None
     achievements: list[AchievementResponse]
     advantage: AdvantageResponse
     contacts: list[ContactResponse]

@@ -4,7 +4,7 @@ from broker.worker import Worker
 from billing.yookassa_client import YooKassaClient
 from infra.payments import PaymentsPg
 from infra.subscriptions import SubscriptionsPg
-from services.subscription_service import SubscriptionService
+from services.subscription import SubscriptionService
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 logger = logging.getLogger(__name__)

@@ -13,9 +13,12 @@ from api.tutors.schema import (
     TutorProfileResponse,
     TutorResponse,
 )
+from auth.users import Users
 from core.exceptions import TutorNotFoundError
 from core.models import TutorStatus
-from core.tutors import AbstractTutorManager, TutorFilter
+from core.tutors import Media, TutorFilter
+from services.subscription import AbstractSubscriptionService
+from services.tutors import AbstractTutorManager
 
 router = APIRouter(prefix="/admin/tutors", tags=["Admin"])
 
@@ -27,36 +30,66 @@ router = APIRouter(prefix="/admin/tutors", tags=["Admin"])
 )
 async def list_for_moderation(
     tutor_filter: Annotated[TutorFilter, Depends()],
+    users: Annotated[Users, Depends()],
+    media: Annotated[Media, Depends()],
+    subscription_service: Annotated[AbstractSubscriptionService, Depends()],
 ) -> list[TutorProfileResponse]:
     profiles = await tutor_filter.for_moderation()
-    return [
-        TutorProfileResponse(
-            id=profile.id,
-            description=profile.description,
-            cities=profile.cities,
-            levels=[level.value for level in profile.levels],
-            price=profile.price,
-            lesson_duration=profile.lesson_duration,
-            work_format=profile.work_format.value,
-            status=profile.status.value,
-            achievements=[
-                AchievementResponse(image=achievement.image)
-                for achievement in profile.achievements
-            ],
-            advantage=AdvantageResponse(
-                video=profile.advantage.video,
-                points=[
-                    PointResponse(text=point.text) for point in profile.advantage.points
+    result: list[TutorProfileResponse] = []
+    for profile in profiles:
+        user = await users.get_by_tutor_id(profile.id)
+        subscription_plan = None
+        if user is not None:
+            subscription_plan = await subscription_service.resolve_subscription_plan(
+                user.id,
+            )
+        achievements: list[AchievementResponse] = []
+        for achievement in profile.achievements:
+            achievement_url = None
+            if achievement.image:
+                achievement_url = await media.url(achievement.image)
+            achievements.append(
+                AchievementResponse(
+                    image=achievement.image,
+                    url=achievement_url,
+                )
+            )
+        video_url = None
+        if profile.advantage.video:
+            video_url = await media.url(profile.advantage.video)
+        photo_key = user.photo if user is not None else None
+        photo_url = None
+        if photo_key:
+            photo_url = await media.url(photo_key)
+        result.append(
+            TutorProfileResponse(
+                id=profile.id,
+                description=profile.description,
+                cities=profile.cities,
+                levels=[level.value for level in profile.levels],
+                price=profile.price,
+                lesson_duration=profile.lesson_duration,
+                work_format=profile.work_format.value,
+                status=profile.status.value,
+                photo_url=photo_url,
+                subscription_plan=subscription_plan,
+                achievements=achievements,
+                advantage=AdvantageResponse(
+                    video=profile.advantage.video,
+                    video_url=video_url,
+                    points=[
+                        PointResponse(text=point.text)
+                        for point in profile.advantage.points
+                    ],
+                ),
+                contacts=[
+                    ContactResponse(name=contact.name, value=contact.value)
+                    for contact in profile.contacts
                 ],
-            ),
-            contacts=[
-                ContactResponse(name=contact.name, value=contact.value)
-                for contact in profile.contacts
-            ],
-            tags=[TagResponse(name=tag.name) for tag in profile.tags],
+                tags=[TagResponse(name=tag.name) for tag in profile.tags],
+            )
         )
-        for profile in profiles
-    ]
+    return result
 
 
 @router.post(

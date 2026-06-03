@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 
-from core.subscriptions import AbstractSubscriptionService
+from services.subscription import AbstractSubscriptionService
 
 router = APIRouter(prefix="/billing", tags=["Billing"])
 

@@ -3,27 +3,28 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, HttpUrl
 
+from billing.subscriptions import SubscriptionPlanId
+
 
 class SubscriptionPlanResponse(BaseModel):
-    id: str
+    id: SubscriptionPlanId
     price_rub: int
     billing_interval: str
 
 
 class UserSubscriptionResponse(BaseModel):
     user_id: UUID
-    plan_id: str
+    plan_id: SubscriptionPlanId
     status: str
     period_start: datetime
     period_end: datetime
     paid_at: datetime
-    yookassa_payment_method_id: str | None = None
 
 
 class SubscriptionHistoryItemResponse(BaseModel):
     id: UUID
     payment_id: UUID
-    plan_id: str
+    plan_id: SubscriptionPlanId
     event_type: str
     period_start: datetime
     period_end: datetime
@@ -34,7 +35,7 @@ class SubscriptionHistoryItemResponse(BaseModel):
 
 class PaymentResponse(BaseModel):
     id: UUID
-    plan_id: str
+    plan_id: SubscriptionPlanId
     event_type: str
     amount_rub: int
     status: str

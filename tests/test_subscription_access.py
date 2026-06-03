@@ -8,7 +8,7 @@ from api.middlewares.subscription_gate import (
     SubscriptionAccessMiddleware,
     SubscriptionRequiredError,
 )
-from core.subscriptions import (
+from billing.subscriptions import (
     SubscriptionPlanId,
     SubscriptionStatus,
     UserSubscription,

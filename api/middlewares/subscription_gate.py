@@ -8,7 +8,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from api.access_policy import RequiredSubscription
 from api.middlewares.route_access import resolve_endpoint_access_rule
 from auth.errors import AccessDeniedError
-from core.subscriptions import SubscriptionPlanId, SubscriptionStatus
+from billing.subscriptions import SubscriptionPlanId, SubscriptionStatus
 from infra.subscriptions import SubscriptionsPg
 
 

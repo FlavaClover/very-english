@@ -3,7 +3,7 @@ import logging
 
 import aiohttp
 
-from core.subscriptions import (
+from billing.subscriptions import (
     PaymentGateway,
     YooKassaPaymentResult,
     YooKassaPaymentStatus,

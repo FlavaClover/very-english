@@ -1,9 +1,40 @@
+from datetime import UTC, datetime
+
 import pytest
 
+from billing.subscriptions import (
+    SubscriptionPlanId,
+    SubscriptionStatus,
+    UserSubscription,
+)
 from core.exceptions import TutorNotFoundError
 from core.models import Contact, Level, Tag, TutorStatus, WorkFormat
+from infra.subscriptions import SubscriptionsPg
 from infra.tutor_filter import TutorFilterPg
-from tests.conftest import seed_tutor
+from infra.users import UsersPg
+from tests.conftest import seed_tutor, seed_tutor_user
+
+
+async def _link_active_subscription(
+    db_connection,
+    tutor_id,
+    plan_id: SubscriptionPlanId = SubscriptionPlanId.BASE,
+) -> None:
+    users = UsersPg(db_connection)
+    subscriptions = SubscriptionsPg(db_connection)
+    now = datetime.now(UTC)
+    user = await seed_tutor_user(db_connection)
+    await users.link_tutor(user.id, tutor_id)
+    await subscriptions.upsert_active(
+        UserSubscription(
+            user_id=user.id,
+            plan_id=plan_id,
+            status=SubscriptionStatus.ACTIVE,
+            period_start=now,
+            period_end=now,
+            paid_at=now,
+        ),
+    )
 
 
 @pytest.mark.asyncio
@@ -51,18 +82,26 @@ async def test_get_profile_not_found_raises(db_connection):
 
 @pytest.mark.asyncio
 async def test_filter_returns_only_approved(db_connection):
-    await seed_tutor(
+    approved = await seed_tutor(
         db_connection,
         description="Approved tutor",
         price=1000,
         status=TutorStatus.APPROVED,
         tag_names=["grammar"],
     )
+    await _link_active_subscription(db_connection, approved.id)
     await seed_tutor(
         db_connection,
         description="Draft tutor",
         price=1000,
         status=TutorStatus.DRAFT,
+        tag_names=["grammar"],
+    )
+    await seed_tutor(
+        db_connection,
+        description="Approved without subscription",
+        price=1000,
+        status=TutorStatus.APPROVED,
         tag_names=["grammar"],
     )
     tutor_filter = TutorFilterPg(db_connection)
@@ -76,7 +115,7 @@ async def test_filter_returns_only_approved(db_connection):
 
 @pytest.mark.asyncio
 async def test_filter_by_price_levels_cities_and_tags(db_connection):
-    await seed_tutor(
+    match = await seed_tutor(
         db_connection,
         description="Match",
         cities=["Moscow"],
@@ -86,6 +125,7 @@ async def test_filter_by_price_levels_cities_and_tags(db_connection):
         tag_names=["grammar", "speaking"],
         status=TutorStatus.APPROVED,
     )
+    await _link_active_subscription(db_connection, match.id)
     await seed_tutor(
         db_connection,
         description="Too expensive",
@@ -142,3 +182,88 @@ async def test_for_moderation_returns_profiles_with_moderation_status(db_connect
     assert len(profiles) == 1
     assert profiles[0].description == "On moderation"
     assert profiles[0].status == TutorStatus.MODERATION
+
+
+@pytest.mark.asyncio
+async def test_filter_pro_only_returns_tutors_with_active_pro(db_connection):
+    pro_tutor = await seed_tutor(
+        db_connection,
+        description="PRO tutor",
+        status=TutorStatus.APPROVED,
+    )
+    base_tutor = await seed_tutor(
+        db_connection,
+        description="BASE tutor",
+        status=TutorStatus.APPROVED,
+    )
+    await seed_tutor(
+        db_connection,
+        description="No subscription",
+        status=TutorStatus.APPROVED,
+    )
+
+    users = UsersPg(db_connection)
+    subscriptions = SubscriptionsPg(db_connection)
+    now = datetime.now(UTC)
+
+    pro_user = await seed_tutor_user(db_connection)
+    await users.link_tutor(pro_user.id, pro_tutor.id)
+    await subscriptions.upsert_active(
+        UserSubscription(
+            user_id=pro_user.id,
+            plan_id=SubscriptionPlanId.PRO,
+            status=SubscriptionStatus.ACTIVE,
+            period_start=now,
+            period_end=now,
+            paid_at=now,
+        ),
+    )
+
+    base_user = await seed_tutor_user(db_connection)
+    await users.link_tutor(base_user.id, base_tutor.id)
+    await subscriptions.upsert_active(
+        UserSubscription(
+            user_id=base_user.id,
+            plan_id=SubscriptionPlanId.BASE,
+            status=SubscriptionStatus.ACTIVE,
+            period_start=now,
+            period_end=now,
+            paid_at=now,
+        ),
+    )
+
+    tutor_filter = TutorFilterPg(db_connection)
+    profiles = await tutor_filter.filter(pro_only=True, page=1, page_size=10)
+
+    assert len(profiles) == 1
+    assert profiles[0].id == pro_tutor.id
+    assert profiles[0].description == "PRO tutor"
+
+
+@pytest.mark.asyncio
+async def test_filter_pro_only_excludes_past_due_pro(db_connection):
+    past_due_tutor = await seed_tutor(
+        db_connection,
+        description="Past due PRO",
+        status=TutorStatus.APPROVED,
+    )
+    users = UsersPg(db_connection)
+    subscriptions = SubscriptionsPg(db_connection)
+    now = datetime.now(UTC)
+    user = await seed_tutor_user(db_connection)
+    await users.link_tutor(user.id, past_due_tutor.id)
+    await subscriptions.upsert_active(
+        UserSubscription(
+            user_id=user.id,
+            plan_id=SubscriptionPlanId.PRO,
+            status=SubscriptionStatus.PAST_DUE,
+            period_start=now,
+            period_end=now,
+            paid_at=now,
+        ),
+    )
+
+    tutor_filter = TutorFilterPg(db_connection)
+    profiles = await tutor_filter.filter(pro_only=True, page=1, page_size=10)
+
+    assert profiles == []

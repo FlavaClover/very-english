@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
-from services.subscription_service import SubscriptionService
+from services.subscription import SubscriptionService
 
 
 def test_calculate_upgrade_amount_rub_mid_period():

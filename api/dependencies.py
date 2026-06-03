@@ -7,25 +7,22 @@ from auth.jwt import JwtIssuer
 from auth.passwords import BcryptPasswordHasher, PasswordHasher
 from auth.users import AbstractUserManager, UserManager, Users
 from billing.yookassa_client import YooKassaClient
-from core.subscriptions import AbstractSubscriptionService
+from services.subscription import AbstractSubscriptionService
+from services.views import AbstractTutorProfileViewService, TutorProfileViewService
 from infra.payments import PaymentsPg
 from infra.users import UsersPg
-from core.tutors import (
-    AbstractTagsManager,
-    AbstractTutorManager,
-    Media,
-    TutorFilter,
-    TutorManager,
-    TagsManager,
-)
+from core.tutors import Media, TutorFilter
+from services.tags import AbstractTagsManager, TagsManager
+from services.tutors import AbstractTutorManager, TutorManager
 from infra.achievements import AchievementsPg
 from infra.advantages import AdvantagesPg
 from infra.contacts import ContactsPg
 from infra.tags import TagsPg
 from infra.subscriptions import SubscriptionsPg
 from infra.tutor_filter import TutorFilterPg
+from infra.views import TutorProfileViewsPg
 from infra.tutors import TutorsPg
-from services.subscription_service import SubscriptionService
+from services.subscription import SubscriptionService
 
 MEDIA_URL_CACHE_TTL_SECONDS = 3600
 
@@ -124,4 +121,14 @@ async def get_subscription_service(
         payments=PaymentsPg(conn),
         subscriptions=SubscriptionsPg(conn),
         gateway=gateway,
+    )
+
+
+async def get_view_service(
+    conn: AsyncConnection = Depends(get_connection),
+) -> AbstractTutorProfileViewService:
+    return TutorProfileViewService(
+        views=TutorProfileViewsPg(conn),
+        tutor_filter=TutorFilterPg(conn),
+        users=UsersPg(conn),
     )
