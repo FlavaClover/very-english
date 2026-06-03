@@ -64,7 +64,7 @@ class S3Media(Media):
 
     async def _generate_presigned_url(self, name: str) -> str:
         async with self._client(self._public_endpoint_url) as client:
-            return client.generate_presigned_url(
+            return await client.generate_presigned_url(
                 ClientMethod="get_object",
                 Params={"Bucket": self._bucket, "Key": name},
                 ExpiresIn=self._presigned_expire_seconds,

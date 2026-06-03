@@ -216,6 +216,12 @@ async def checkout(
             status_code=400,
             media_type="application/json",
         )
+    except InvalidSubscriptionStateError as exc:
+        return Response(
+            content=ErrorResponse(detail=str(exc)).model_dump_json(),
+            status_code=400,
+            media_type="application/json",
+        )
 
     return CheckoutResponse(
         payment_id=result.payment_id,

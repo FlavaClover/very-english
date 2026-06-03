@@ -24,6 +24,8 @@ from api.dependencies import (
     get_users,
 )
 from api.middlewares import JwtAccessMiddleware, SubscriptionAccessMiddleware
+from api.middlewares.request_client_ip_log import RequestClientIpLogMiddleware
+from api.middlewares.yookassa_webhook_ip import YooKassaWebhookIpMiddleware
 from api.subscriptions.endpoints import router as subscriptions_router
 from api.tags.endpoints import router as tags_router
 from api.tutors.endpoints import router as tutors_router
@@ -31,6 +33,7 @@ from api.users.endpoints import router as users_router
 from auth.jwt import JwtIssuer
 from auth.users import AbstractUserManager, Users
 from billing.yookassa_client import YooKassaClient
+from billing.yookassa_webhook_ip import YooKassaWebhookIpValidator
 from core.subscriptions import AbstractSubscriptionService
 from core.tutors import AbstractTagsManager, AbstractTutorManager, Media, TutorFilter
 from infra.s3_media import S3Media
@@ -51,6 +54,7 @@ def create_server(
     aws_endpoint_url: str | None = None,
     aws_public_endpoint_url: str | None = None,
     redis_url: str = "redis://127.0.0.1:6379/0",
+    yookassa_webhook_ip_check_enabled: bool = True,
 ) -> FastAPI:
     """Собирает FastAPI-приложение с DI, middleware и роутерами."""
     db_engine = create_async_engine(
@@ -76,6 +80,9 @@ def create_server(
 
     app.state.db_engine = db_engine
     app.state.cors_allow_origins = cors_allow_origins
+    app.state.yookassa_webhook_ip_validator = YooKassaWebhookIpValidator(
+        enabled=yookassa_webhook_ip_check_enabled,
+    )
     app.state.jwt_issuer = JwtIssuer(
         secret_key=jwt_secret_key,
         expire_minutes=jwt_expire_minutes,
@@ -109,6 +116,8 @@ def create_server(
     )
     app.add_middleware(SubscriptionAccessMiddleware, db_engine=db_engine)
     app.add_middleware(JwtAccessMiddleware, jwt_secret=jwt_secret_key)
+    app.add_middleware(YooKassaWebhookIpMiddleware)
+    app.add_middleware(RequestClientIpLogMiddleware)
 
     app.include_router(auth_router)
     app.include_router(users_router)

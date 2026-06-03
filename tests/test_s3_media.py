@@ -29,7 +29,7 @@ def _s3_client_mock() -> AsyncMock:
     client = AsyncMock()
     client.put_object = AsyncMock()
     client.delete_object = AsyncMock()
-    client.generate_presigned_url = MagicMock(
+    client.generate_presigned_url = AsyncMock(
         return_value="https://s3.test/photo.png?signed=1"
     )
     client.__aenter__ = AsyncMock(return_value=client)
@@ -77,7 +77,7 @@ async def test_s3_media_remove_deletes_object():
 async def test_s3_media_url_uses_public_endpoint_for_presign():
     internal_client = _s3_client_mock()
     public_client = _s3_client_mock()
-    public_client.generate_presigned_url = MagicMock(
+    public_client.generate_presigned_url = AsyncMock(
         return_value="http://localhost:9000/test-bucket/photo.png?signed=1"
     )
     session = MagicMock()

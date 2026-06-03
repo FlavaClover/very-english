@@ -42,6 +42,10 @@ def _run_api() -> None:
     redis_url = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
     yookassa_shop_id = os.environ["YOOKASSA_SHOP_ID"]
     yookassa_secret_key = os.environ["YOOKASSA_SECRET_KEY"]
+    yookassa_webhook_ip_check_enabled = os.environ.get(
+        "YOOKASSA_WEBHOOK_IP_CHECK",
+        "true",
+    ).lower() not in {"0", "false", "no", "off"}
 
     app = create_server(
         database_url=database_url,
@@ -58,6 +62,7 @@ def _run_api() -> None:
         aws_endpoint_url=aws_endpoint_url,
         aws_public_endpoint_url=aws_public_endpoint_url,
         redis_url=redis_url,
+        yookassa_webhook_ip_check_enabled=yookassa_webhook_ip_check_enabled,
     )
     uvicorn.run(app, host=api_host, port=api_port)
 

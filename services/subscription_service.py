@@ -70,6 +70,10 @@ class SubscriptionService(AbstractSubscriptionService):
         if plan is None:
             raise InvalidPlanError(f"Unknown plan: {plan_id.value}")
 
+        active = await self._subscriptions.get_active(user_id)
+        if active is not None and active.status is SubscriptionStatus.ACTIVE:
+            raise InvalidSubscriptionStateError("Active subscription already exists")
+
         payment_id = uuid4()
         idempotence_key = str(uuid4())
         payment = PaymentRecord(
