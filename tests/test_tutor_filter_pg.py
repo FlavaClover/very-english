@@ -8,7 +8,7 @@ from billing.subscriptions import (
     UserSubscription,
 )
 from core.exceptions import TutorNotFoundError
-from core.models import Contact, Level, Tag, TutorStatus, WorkFormat
+from core.models import Contact, Level, PriceSort, Tag, TutorStatus, WorkFormat
 from infra.subscriptions import SubscriptionsPg
 from infra.tutor_filter import TutorFilterPg
 from infra.users import UsersPg
@@ -238,6 +238,74 @@ async def test_filter_pro_only_returns_tutors_with_active_pro(db_connection):
     assert len(profiles) == 1
     assert profiles[0].id == pro_tutor.id
     assert profiles[0].description == "PRO tutor"
+
+
+@pytest.mark.asyncio
+async def test_filter_sorts_by_price_asc(db_connection):
+    cheap = await seed_tutor(
+        db_connection,
+        description="Cheap",
+        price=1000,
+        status=TutorStatus.APPROVED,
+    )
+    expensive = await seed_tutor(
+        db_connection,
+        description="Expensive",
+        price=5000,
+        status=TutorStatus.APPROVED,
+    )
+    mid = await seed_tutor(
+        db_connection,
+        description="Mid",
+        price=2500,
+        status=TutorStatus.APPROVED,
+    )
+    await _link_active_subscription(db_connection, cheap.id)
+    await _link_active_subscription(db_connection, expensive.id)
+    await _link_active_subscription(db_connection, mid.id)
+    tutor_filter = TutorFilterPg(db_connection)
+
+    profiles = await tutor_filter.filter(
+        price_sort=PriceSort.ASC,
+        page=1,
+        page_size=10,
+    )
+
+    assert [profile.price for profile in profiles] == [1000, 2500, 5000]
+
+
+@pytest.mark.asyncio
+async def test_filter_sorts_by_price_desc(db_connection):
+    cheap = await seed_tutor(
+        db_connection,
+        description="Cheap",
+        price=1000,
+        status=TutorStatus.APPROVED,
+    )
+    expensive = await seed_tutor(
+        db_connection,
+        description="Expensive",
+        price=5000,
+        status=TutorStatus.APPROVED,
+    )
+    mid = await seed_tutor(
+        db_connection,
+        description="Mid",
+        price=2500,
+        status=TutorStatus.APPROVED,
+    )
+    await _link_active_subscription(db_connection, cheap.id)
+    await _link_active_subscription(db_connection, expensive.id)
+    await _link_active_subscription(db_connection, mid.id)
+    tutor_filter = TutorFilterPg(db_connection)
+
+    profiles = await tutor_filter.filter(
+        price_sort=PriceSort.DESC,
+        page=1,
+        page_size=10,
+    )
+
+    assert [profile.price for profile in profiles] == [5000, 2500, 1000]
 
 
 @pytest.mark.asyncio

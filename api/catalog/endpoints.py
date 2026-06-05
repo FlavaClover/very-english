@@ -14,7 +14,7 @@ from api.tutors.schema import (
 )
 from auth.users import Users
 from core.exceptions import TutorNotFoundError
-from core.models import Level, Tag, WorkFormat
+from core.models import Level, PriceSort, Tag, WorkFormat
 from services.subscription import AbstractSubscriptionService
 from services.views import AbstractTutorProfileViewService
 from core.tutors import Media, TutorFilter
@@ -39,6 +39,10 @@ async def list_tutors(
     cities: list[str] | None = Query(default=None),
     tags: list[str] | None = Query(default=None),
     pro_only: bool = Query(default=False),
+    price_sort: PriceSort | None = Query(
+        default=None,
+        description="Сортировка по цене: asc — по возрастанию, desc — по убыванию",
+    ),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=10, ge=1, le=100),
 ) -> list[TutorProfileResponse]:
@@ -55,6 +59,7 @@ async def list_tutors(
         cities=cities,
         tags=parsed_tags,
         pro_only=pro_only,
+        price_sort=price_sort,
         page=page,
         page_size=page_size,
     )

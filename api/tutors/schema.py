@@ -3,6 +3,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from billing.subscriptions import SubscriptionPlanId
+from core.models import PriceSort
 
 
 class ContactRequest(BaseModel):
@@ -90,5 +91,6 @@ class TutorListQuery(BaseModel):
     work_formats: list[str] | None = None
     cities: list[str] | None = None
     tags: list[str] | None = None
+    price_sort: PriceSort | None = None
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=10, ge=1, le=100)

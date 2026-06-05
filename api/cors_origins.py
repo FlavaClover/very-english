@@ -15,4 +15,5 @@ DEFAULT_CORS_ALLOW_ORIGINS: list[str] = [
     "http://95.163.244.138:3000",
     "http://95.163.244.138:5173",
     "http://95.163.244.138:8000",
+    "https://very-english.ru",
 ]

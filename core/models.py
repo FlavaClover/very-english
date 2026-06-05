@@ -27,6 +27,11 @@ class TutorStatus(Enum):
     REJECTED = "rejected"
 
 
+class PriceSort(Enum):
+    ASC = "asc"
+    DESC = "desc"
+
+
 @dataclass
 class Contact:
     name: str

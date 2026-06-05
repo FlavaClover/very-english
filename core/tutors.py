@@ -13,6 +13,7 @@ from core.models import (
     TutorProfile,
     Advantage,
     TutorStatusHistory,
+    PriceSort,
 )
 
 
@@ -216,6 +217,7 @@ class TutorFilter(ABC):
         cities: list[str] | None = None,
         tags: list[Tag] | None = None,
         pro_only: bool = False,
+        price_sort: PriceSort | None = None,
         page: int = 1,
         page_size: int = 10,
     ) -> list[TutorProfile]:
@@ -225,6 +227,8 @@ class TutorFilter(ABC):
 
         :param pro_only: Если True, только туторы с активной подпиской PRO;
             иначе любой активный план (BASE или PRO).
+        :param price_sort: Сортировка по цене (по возрастанию или убыванию);
+            если не задана — по дате создания (новые первыми).
         """
         pass
 

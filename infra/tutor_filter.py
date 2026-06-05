@@ -10,6 +10,7 @@ from core.models import (
     Contact,
     Level,
     Point,
+    PriceSort,
     Tag,
     TutorProfile,
     TutorStatus,
@@ -23,6 +24,14 @@ class TutorFilterPg(TutorFilter):
     def __init__(self, connection: AsyncConnection) -> None:
         self._connection = connection
 
+    @staticmethod
+    def _order_clause(price_sort: PriceSort | None) -> str:
+        if price_sort is None:
+            return "t.created_at DESC"
+        if price_sort == PriceSort.ASC:
+            return "t.price ASC, t.created_at DESC"
+        return "t.price DESC, t.created_at DESC"
+
     async def filter(
         self,
         price_from: int | None = None,
@@ -32,6 +41,7 @@ class TutorFilterPg(TutorFilter):
         cities: list[str] | None = None,
         tags: list[Tag] | None = None,
         pro_only: bool = False,
+        price_sort: PriceSort | None = None,
         page: int = 1,
         page_size: int = 10,
     ) -> list[TutorProfile]:
@@ -109,6 +119,7 @@ class TutorFilterPg(TutorFilter):
             params["active_status"] = SubscriptionStatus.ACTIVE.value
 
         where_clause = " AND ".join(conditions)
+        order_clause = self._order_clause(price_sort)
         result = await self._connection.execute(
             text(
                 f"""
@@ -125,7 +136,7 @@ class TutorFilterPg(TutorFilter):
                         AND latest.max_seq = sh.seq
                 ) current_status ON current_status.tutor_id = t.id
                 WHERE {where_clause}
-                ORDER BY t.created_at DESC
+                ORDER BY {order_clause}
                 LIMIT :limit OFFSET :offset
                 """
             ),
