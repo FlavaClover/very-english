@@ -4,6 +4,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from api.server import create_server
+from tests.test_auth import FakeVkIdOAuth
 
 
 @pytest.fixture
@@ -19,6 +20,7 @@ def api_app(async_engine):
         yookassa_secret_key="test-secret",
     )
     app.state.db_engine = async_engine
+    app.state.vkid_client = FakeVkIdOAuth()
     return app
 
 
@@ -54,6 +56,37 @@ async def test_register_and_login(api_app):
         )
         assert me_response.status_code == 200
         assert me_response.json()["email"] == email
+
+
+@pytest.mark.asyncio
+async def test_login_vkid_endpoint(api_app):
+    api_app.state.vkid_client = FakeVkIdOAuth(
+        user_id=987654321,
+        email="vk-user@example.com",
+    )
+
+    transport = ASGITransport(app=api_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        login_response = await client.post(
+            "/auth/login/vkid",
+            json={
+                "code": "vk-auth-code",
+                "state": "e" * 32,
+                "code_verifier": "f" * 43,
+                "device_id": "device-42",
+            },
+        )
+        assert login_response.status_code == 200
+        tokens = login_response.json()
+        assert "access_token" in tokens
+        assert "refresh_token" in tokens
+
+        me_response = await client.get(
+            "/users/me",
+            headers={"Authorization": f"Bearer {tokens['access_token']}"},
+        )
+        assert me_response.status_code == 200
+        assert me_response.json()["email"] == "vk-user@example.com"
 
 
 @pytest.mark.asyncio

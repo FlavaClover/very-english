@@ -46,6 +46,8 @@ def _run_api() -> None:
         "YOOKASSA_WEBHOOK_IP_CHECK",
         "true",
     ).lower() not in {"0", "false", "no", "off"}
+    vk_id_client_id = os.environ.get("VK_ID_CLIENT_ID", "")
+    vk_id_redirect_uri = os.environ.get("VK_ID_REDIRECT_URI", "")
 
     app = create_server(
         database_url=database_url,
@@ -63,6 +65,8 @@ def _run_api() -> None:
         aws_public_endpoint_url=aws_public_endpoint_url,
         redis_url=redis_url,
         yookassa_webhook_ip_check_enabled=yookassa_webhook_ip_check_enabled,
+        vk_id_client_id=vk_id_client_id,
+        vk_id_redirect_uri=vk_id_redirect_uri,
     )
     uvicorn.run(app, host=api_host, port=api_port)
 

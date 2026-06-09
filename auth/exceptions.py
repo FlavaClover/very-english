@@ -12,3 +12,7 @@ class UserNotFoundError(Exception):
 
 class InvalidTokenError(Exception):
     """JWT токен недействителен или просрочен."""
+
+
+class VkIdAuthError(Exception):
+    """Ошибка авторизации через VK ID."""

@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response
 
+from api.auth.schema import VkIdLoginRequest
 from api.schema import ErrorResponse
 from api.users.schema import (
     RefreshTokenRequest,
@@ -15,6 +16,7 @@ from auth.exceptions import (
     InvalidTokenError,
     UserAlreadyExistsError,
     UserNotFoundError,
+    VkIdAuthError,
 )
 from auth.models import UserRole
 from auth.users import AbstractUserManager
@@ -105,6 +107,35 @@ async def login(
             password=payload.password,
         )
     except InvalidCredentialsError as exc:
+        return Response(
+            content=ErrorResponse(detail=str(exc)).model_dump_json(),
+            status_code=401,
+            media_type="application/json",
+        )
+    return TokenPairResponse(
+        access_token=tokens.access_token,
+        refresh_token=tokens.refresh_token,
+    )
+
+
+@router.post(
+    "/login/vkid",
+    response_model=TokenPairResponse,
+    responses={401: {"model": ErrorResponse}},
+    summary="Вход через VK ID",
+)
+async def login_vkid(
+    payload: VkIdLoginRequest,
+    user_manager: Annotated[AbstractUserManager, Depends()],
+) -> TokenPairResponse | Response:
+    try:
+        _, tokens = await user_manager.login_vkid(
+            code=payload.code,
+            state=payload.state,
+            code_verifier=payload.code_verifier,
+            device_id=payload.device_id,
+        )
+    except VkIdAuthError as exc:
         return Response(
             content=ErrorResponse(detail=str(exc)).model_dump_json(),
             status_code=401,

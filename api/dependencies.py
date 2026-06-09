@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 from auth.jwt import JwtIssuer
 from auth.passwords import BcryptPasswordHasher, PasswordHasher
 from auth.users import AbstractUserManager, UserManager, Users
+from auth.vkid import VkIdOAuth
 from billing.yookassa_client import YooKassaClient
 from services.subscription import AbstractSubscriptionService
 from services.views import AbstractTutorProfileViewService, TutorProfileViewService
@@ -20,7 +21,7 @@ from infra.contacts import ContactsPg
 from infra.tags import TagsPg
 from infra.subscriptions import SubscriptionsPg
 from infra.tutor_filter import TutorFilterPg
-from infra.views import TutorProfileViewsPg
+from infra.views import TutorProfileViewAnalyticsPg, TutorProfileViewsPg
 from infra.tutors import TutorsPg
 from services.subscription import SubscriptionService
 
@@ -36,6 +37,10 @@ async def get_connection(request: Request) -> AsyncIterator[AsyncConnection]:
 
 def get_jwt_issuer(request: Request) -> JwtIssuer:
     return request.app.state.jwt_issuer
+
+
+def get_vkid_oauth(request: Request) -> VkIdOAuth:
+    return request.app.state.vkid_client
 
 
 def get_password_hasher() -> PasswordHasher:
@@ -66,12 +71,14 @@ def build_user_manager(
     media: Media,
     jwt_issuer: JwtIssuer,
     password_hasher: PasswordHasher,
+    vkid_oauth: VkIdOAuth,
 ) -> UserManager:
     return UserManager(
         users=UsersPg(conn),
         media=media,
         password_hasher=password_hasher,
         jwt_issuer=jwt_issuer,
+        vkid_oauth=vkid_oauth,
     )
 
 
@@ -93,8 +100,9 @@ async def get_user_manager(
     media: Media = Depends(get_media),
     jwt_issuer: JwtIssuer = Depends(get_jwt_issuer),
     password_hasher: PasswordHasher = Depends(get_password_hasher),
+    vkid_oauth: VkIdOAuth = Depends(get_vkid_oauth),
 ) -> AbstractUserManager:
-    return build_user_manager(conn, media, jwt_issuer, password_hasher)
+    return build_user_manager(conn, media, jwt_issuer, password_hasher, vkid_oauth)
 
 
 async def get_tutor_filter(
@@ -129,6 +137,7 @@ async def get_view_service(
 ) -> AbstractTutorProfileViewService:
     return TutorProfileViewService(
         views=TutorProfileViewsPg(conn),
+        view_analytics=TutorProfileViewAnalyticsPg(conn),
         tutor_filter=TutorFilterPg(conn),
         users=UsersPg(conn),
     )

@@ -33,6 +33,7 @@ from api.tutors.endpoints import router as tutors_router
 from api.users.endpoints import router as users_router
 from auth.jwt import JwtIssuer
 from auth.users import AbstractUserManager, Users
+from auth.vkid import VkIdClient
 from billing.yookassa_client import YooKassaClient
 from billing.yookassa_webhook_ip import YooKassaWebhookIpValidator
 from services.subscription import AbstractSubscriptionService
@@ -59,6 +60,8 @@ def create_server(
     aws_public_endpoint_url: str | None = None,
     redis_url: str = "redis://127.0.0.1:6379/0",
     yookassa_webhook_ip_check_enabled: bool = True,
+    vk_id_client_id: str = "",
+    vk_id_redirect_uri: str = "",
 ) -> FastAPI:
     """Собирает FastAPI-приложение с DI, middleware и роутерами."""
     db_engine = create_async_engine(
@@ -75,6 +78,11 @@ def create_server(
             http_session,
             yookassa_shop_id,
             yookassa_secret_key,
+        )
+        app.state.vkid_client = VkIdClient(
+            http_session,
+            vk_id_client_id,
+            vk_id_redirect_uri,
         )
         yield
         await http_session.close()

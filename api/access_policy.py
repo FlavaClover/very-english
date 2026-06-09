@@ -38,6 +38,11 @@ ENDPOINT_ACCESS_RULES: dict[tuple[str, str], EndpointAccessRule] = {
         path="/auth/login",
         require_jwt=False,
     ),
+    ("POST", "/auth/login/vkid"): EndpointAccessRule(
+        method="POST",
+        path="/auth/login/vkid",
+        require_jwt=False,
+    ),
     ("POST", "/auth/refresh"): EndpointAccessRule(
         method="POST",
         path="/auth/refresh",
@@ -51,6 +56,16 @@ ENDPOINT_ACCESS_RULES: dict[tuple[str, str], EndpointAccessRule] = {
     ("GET", "/users/me/recent-tutor-profiles"): EndpointAccessRule(
         method="GET",
         path="/users/me/recent-tutor-profiles",
+        require_jwt=True,
+    ),
+    ("DELETE", "/users/me/recent-tutor-profiles"): EndpointAccessRule(
+        method="DELETE",
+        path="/users/me/recent-tutor-profiles",
+        require_jwt=True,
+    ),
+    ("DELETE", "/users/me/recent-tutor-profiles/{tutor_id}"): EndpointAccessRule(
+        method="DELETE",
+        path="/users/me/recent-tutor-profiles/{tutor_id}",
         require_jwt=True,
     ),
     ("PATCH", "/users/me"): EndpointAccessRule(

@@ -1,5 +1,5 @@
 from typing import Annotated
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
 
@@ -248,3 +248,28 @@ async def get_recent_tutor_profiles(
             )
         )
     return result
+
+
+@router.delete(
+    "/me/recent-tutor-profiles",
+    status_code=204,
+    summary="Очистка списка недавних просмотров",
+)
+async def clear_recent_tutor_profiles(
+    request: Request,
+    profile_views: Annotated[AbstractTutorProfileViewService, Depends()],
+) -> None:
+    await profile_views.clear_recent_views(request.state.user_id)
+
+
+@router.delete(
+    "/me/recent-tutor-profiles/{tutor_id}",
+    status_code=204,
+    summary="Удаление просмотра из недавних",
+)
+async def remove_recent_tutor_profile(
+    request: Request,
+    tutor_id: UUID,
+    profile_views: Annotated[AbstractTutorProfileViewService, Depends()],
+) -> None:
+    await profile_views.remove_recent_view(request.state.user_id, tutor_id)

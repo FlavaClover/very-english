@@ -17,7 +17,7 @@ from billing.subscriptions import (
 from infra.subscriptions import SubscriptionsPg
 from infra.users import UsersPg
 from tests.conftest import seed_tutor
-from tests.test_auth import InMemoryMedia
+from tests.test_auth import FakeVkIdOAuth, InMemoryMedia
 
 
 @pytest.fixture
@@ -34,6 +34,7 @@ def api_app(async_engine):
     )
     app.state.db_engine = async_engine
     app.state.media = InMemoryMedia()
+    app.state.vkid_client = FakeVkIdOAuth()
     app.state.yookassa_client = MagicMock(spec=YooKassaClient)
     return app
 

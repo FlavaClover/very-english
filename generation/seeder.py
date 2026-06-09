@@ -184,10 +184,7 @@ class DatabaseSeeder:
             user.last_name,
             user.email,
         )
-        photo_key = await self._media.upload_user_photo(
-            user.id,
-            use_cat=index % 2 == 0,
-        )
+        photo_key = await self._media.upload_user_photo(user.id)
         user.photo = photo_key
         await users.create(user, self._password_hasher.hash(password))
         logger.info("[%s/%s] Пользователь сохранён: id=%s", index + 1, total, user.id)
@@ -225,10 +222,7 @@ class DatabaseSeeder:
             user.last_name,
             user.email,
         )
-        photo_key = await self._media.upload_user_photo(
-            user.id,
-            use_cat=status_index % 2 == 1,
-        )
+        photo_key = await self._media.upload_user_photo(user.id)
         user.photo = photo_key
         await users.create(user, self._password_hasher.hash(password))
 
@@ -273,7 +267,6 @@ class DatabaseSeeder:
             image_key = await self._media.upload_achievement_image(
                 tutor.id,
                 achievement_index,
-                use_cat=achievement_index % 2 == 0,
             )
             await achievements_pg.add(
                 tutor.id,

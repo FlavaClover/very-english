@@ -13,7 +13,7 @@ class TutorProfileView:
 
 
 class TutorProfileViews(ABC):
-    """Хранилище просмотров профилей туторов."""
+    """Хранилище недавних просмотров профилей туторов для пользователя."""
 
     @abstractmethod
     async def upsert_view(self, user_id: UUID, tutor_id: UUID) -> None:
@@ -34,4 +34,31 @@ class TutorProfileViews(ABC):
         :param user_id: Идентификатор пользователя.
         :param limit: Максимум записей.
         :return: Список просмотров.
+        """
+
+    @abstractmethod
+    async def delete_view(self, user_id: UUID, tutor_id: UUID) -> None:
+        """Удаляет просмотр конкретного тутора из списка недавних.
+
+        :param user_id: Идентификатор пользователя.
+        :param tutor_id: Идентификатор тутора.
+        """
+
+    @abstractmethod
+    async def delete_all(self, user_id: UUID) -> None:
+        """Очищает весь список недавних просмотров пользователя.
+
+        :param user_id: Идентификатор пользователя.
+        """
+
+
+class TutorProfileViewAnalytics(ABC):
+    """Хранилище событий просмотров профилей туторов для аналитики."""
+
+    @abstractmethod
+    async def record_event(self, user_id: UUID, tutor_id: UUID) -> None:
+        """Добавляет одно событие просмотра.
+
+        :param user_id: Идентификатор пользователя.
+        :param tutor_id: Идентификатор тутора.
         """

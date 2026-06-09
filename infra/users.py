@@ -86,6 +86,77 @@ class UsersPg(Users):
 
         return self._row_to_user(row)
 
+    async def get_by_vk_id(self, vk_id: int) -> User:
+        result = await self._connection.execute(
+            text(
+                """
+                SELECT
+                    id,
+                    photo,
+                    first_name,
+                    last_name,
+                    email,
+                    role::text AS role,
+                    autopayment_consent
+                FROM users
+                WHERE vk_id = :vk_id
+                """
+            ),
+            dict(vk_id=vk_id),
+        )
+        row = result.mappings().first()
+        if row is None:
+            raise UserNotFoundError
+
+        return self._row_to_user(row)
+
+    async def create_vk_user(
+        self,
+        user: User,
+        vk_id: int,
+        password_hash: str,
+    ) -> User:
+        await self._connection.execute(
+            text(
+                """
+                INSERT INTO users (
+                    id,
+                    photo,
+                    first_name,
+                    last_name,
+                    email,
+                    password_hash,
+                    role,
+                    autopayment_consent,
+                    vk_id
+                )
+                VALUES (
+                    :id,
+                    :photo,
+                    :first_name,
+                    :last_name,
+                    :email,
+                    :password_hash,
+                    CAST(:role AS user_role),
+                    :autopayment_consent,
+                    :vk_id
+                )
+                """
+            ),
+            dict(
+                id=user.id,
+                photo=user.photo,
+                first_name=user.first_name,
+                last_name=user.last_name,
+                email=user.email,
+                password_hash=password_hash,
+                role=user.role.value,
+                autopayment_consent=user.autopayment_consent,
+                vk_id=vk_id,
+            ),
+        )
+        return user
+
     async def get_by_email(self, email: str) -> User:
         result = await self._connection.execute(
             text(

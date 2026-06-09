@@ -51,15 +51,11 @@ class GenerationMediaStorage:
         logger.info("Временная директория для медиа: %s", temp_dir)
         return cls(media=media, fetcher=fetcher, temp_dir=temp_dir)
 
-    async def upload_user_photo(self, user_id: UUID, use_cat: bool = False) -> str:
+    async def upload_user_photo(self, user_id: UUID) -> str:
         key = f"users/{user_id}/avatar.jpg"
-        source = "кот" if use_cat else "собака"
-        logger.info("Аватар пользователя %s (%s)", user_id, source)
+        logger.info("Аватар пользователя %s (dog.ceo)", user_id)
         path = self._temp_dir / f"{user_id}-avatar.jpg"
-        if use_cat:
-            await self._fetcher.download_cat_image(path)
-        else:
-            await self._fetcher.download_dog_image(path)
+        await self._fetcher.download_dog_image(path)
         await self._media.add(path, key)
         logger.info("Аватар загружен в S3: %s", key)
         return key
@@ -68,21 +64,15 @@ class GenerationMediaStorage:
         self,
         tutor_id: UUID,
         index: int,
-        use_cat: bool,
     ) -> str:
         key = f"tutors/{tutor_id}/achievements/{index}.jpg"
-        source = "кот" if use_cat else "собака"
         logger.info(
-            "Достижение #%s тутора %s (%s)",
+            "Достижение #%s тутора %s (dog.ceo)",
             index + 1,
             tutor_id,
-            source,
         )
         path = self._temp_dir / f"{tutor_id}-ach-{index}.jpg"
-        if use_cat:
-            await self._fetcher.download_cat_image(path)
-        else:
-            await self._fetcher.download_dog_image(path)
+        await self._fetcher.download_dog_image(path)
         await self._media.add(path, key)
         logger.info("Достижение загружено в S3: %s", key)
         return key

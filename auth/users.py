@@ -7,10 +7,12 @@ from auth.exceptions import (
     InvalidCredentialsError,
     UserAlreadyExistsError,
     UserNotFoundError,
+    VkIdAuthError,
 )
 from auth.jwt import JwtIssuer, TokenPair
 from auth.models import User, UserRole
 from auth.passwords import PasswordHasher
+from auth.vkid import VkIdApiError, VkIdOAuth
 from core.tutors import Media
 
 
@@ -59,6 +61,19 @@ class Users(ABC):
     async def set_autopayment_consent(self, user_id: UUID, consent: bool) -> User:
         """Обновляет согласие пользователя на автоплатежи."""
 
+    @abstractmethod
+    async def get_by_vk_id(self, vk_id: int) -> User:
+        """Возвращает пользователя по идентификатору VK ID."""
+
+    @abstractmethod
+    async def create_vk_user(
+        self,
+        user: User,
+        vk_id: int,
+        password_hash: str,
+    ) -> User:
+        """Создаёт пользователя, привязанного к VK ID."""
+
 
 class AbstractUserManager(ABC):
     @abstractmethod
@@ -74,6 +89,16 @@ class AbstractUserManager(ABC):
 
     @abstractmethod
     async def login(self, email: str, password: str) -> tuple[User, TokenPair]:
+        pass
+
+    @abstractmethod
+    async def login_vkid(
+        self,
+        code: str,
+        state: str,
+        code_verifier: str,
+        device_id: str,
+    ) -> tuple[User, TokenPair]:
         pass
 
     @abstractmethod
@@ -121,11 +146,13 @@ class UserManager(AbstractUserManager):
         media: Media,
         password_hasher: PasswordHasher,
         jwt_issuer: JwtIssuer,
+        vkid_oauth: VkIdOAuth,
     ) -> None:
         self._users = users
         self._media = media
         self._password_hasher = password_hasher
         self._jwt = jwt_issuer
+        self._vkid_oauth = vkid_oauth
 
     async def register(
         self,
@@ -174,6 +201,66 @@ class UserManager(AbstractUserManager):
         password_hash = await self._users.get_password_hash(user.id)
         if not self._password_hasher.verify(password, password_hash):
             raise InvalidCredentialsError
+
+        tokens = self._jwt.create_token_pair(
+            user_id=user.id,
+            role=user.role,
+            email=user.email,
+        )
+        return user, tokens
+
+    async def login_vkid(
+        self,
+        code: str,
+        state: str,
+        code_verifier: str,
+        device_id: str,
+    ) -> tuple[User, TokenPair]:
+        """Аутентифицирует пользователя через VK ID и выпускает пару JWT.
+
+        :param code: Код подтверждения из redirect URI VK ID.
+        :param state: Строка состояния OAuth.
+        :param code_verifier: PKCE code verifier.
+        :param device_id: Идентификатор устройства VK ID.
+        :return: Пользователь и пара access/refresh токенов.
+        :raises VkIdAuthError: Если VK ID отклонил запрос или профиль недоступен.
+        """
+        try:
+            token_response = await self._vkid_oauth.exchange_authorization_code(
+                code=code,
+                code_verifier=code_verifier,
+                device_id=device_id,
+                state=state,
+            )
+            profile = await self._vkid_oauth.get_user_profile(
+                token_response.access_token
+            )
+        except VkIdApiError as exc:
+            raise VkIdAuthError(str(exc)) from exc
+
+        try:
+            user = await self._users.get_by_vk_id(profile.user_id)
+        except UserNotFoundError:
+            email = profile.email or f"{profile.user_id}@vkid.local"
+            if await self._users.is_email_taken(email):
+                raise VkIdAuthError(
+                    "VK ID account cannot be linked: email is already registered"
+                ) from None
+
+            last_name = profile.last_name or "—"
+            user = User(
+                id=uuid4(),
+                first_name=profile.first_name,
+                last_name=last_name,
+                email=email,
+                role=UserRole.USER,
+            )
+            password_hash = self._password_hasher.hash(uuid4().hex)
+            user = await self._users.create_vk_user(
+                user=user,
+                vk_id=profile.user_id,
+                password_hash=password_hash,
+            )
 
         tokens = self._jwt.create_token_pair(
             user_id=user.id,
