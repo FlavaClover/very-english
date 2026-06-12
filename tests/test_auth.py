@@ -15,6 +15,7 @@ from auth.models import UserRole
 from auth.vkid import VkIdTokenResponse, VkIdUserProfile
 from infra.users import UsersPg
 from tests.conftest import seed_tutor
+from tests.email_verification_helpers import AllowAllEmailVerification
 
 
 class FakeVkIdOAuth:
@@ -94,11 +95,17 @@ def vkid_oauth() -> FakeVkIdOAuth:
 
 
 @pytest.fixture
+def email_verification_service() -> AllowAllEmailVerification:
+    return AllowAllEmailVerification()
+
+
+@pytest.fixture
 def user_manager(
     db_connection,
     jwt_issuer,
     password_hasher,
     vkid_oauth,
+    email_verification_service,
 ) -> UserManager:
     return UserManager(
         users=UsersPg(db_connection),
@@ -106,6 +113,7 @@ def user_manager(
         password_hasher=password_hasher,
         jwt_issuer=jwt_issuer,
         vkid_oauth=vkid_oauth,
+        email_verification_service=email_verification_service,
     )
 
 
@@ -166,6 +174,7 @@ async def test_register_and_login(user_manager, jwt_issuer):
         last_name="Doe",
         email="john@example.com",
         password="secret123",
+        email_verification_id=uuid4(),
         role=UserRole.USER,
     )
 
@@ -188,6 +197,7 @@ async def test_refresh_tokens(user_manager, jwt_issuer):
         last_name="User",
         email="refresh@example.com",
         password="secret123",
+        email_verification_id=uuid4(),
     )
     _, tokens = await user_manager.login("refresh@example.com", "secret123")
 
@@ -208,6 +218,7 @@ async def test_register_duplicate_email_raises(user_manager):
         last_name="User",
         email="dup@example.com",
         password="password",
+        email_verification_id=uuid4(),
     )
 
     with pytest.raises(UserAlreadyExistsError):
@@ -216,6 +227,7 @@ async def test_register_duplicate_email_raises(user_manager):
             last_name="User",
             email="dup@example.com",
             password="password",
+            email_verification_id=uuid4(),
         )
 
 
@@ -226,6 +238,7 @@ async def test_login_invalid_password_raises(user_manager):
         last_name="Doe",
         email="jane@example.com",
         password="correct",
+        email_verification_id=uuid4(),
     )
 
     with pytest.raises(InvalidCredentialsError):
@@ -239,6 +252,7 @@ async def test_set_photo_uploads_via_media(user_manager, tmp_path):
         last_name="User",
         email="photo@example.com",
         password="password",
+        email_verification_id=uuid4(),
     )
     photo_path = tmp_path / "avatar.png"
     photo_path.write_bytes(b"avatar")
@@ -259,6 +273,7 @@ async def test_link_tutor_profile(user_manager, db_connection):
         last_name="Account",
         email="tutor-account@example.com",
         password="password",
+        email_verification_id=uuid4(),
         role=UserRole.TUTOR,
     )
 
@@ -322,6 +337,7 @@ async def test_login_vkid_rejects_conflicting_email(
         last_name="User",
         email="ivan@example.com",
         password="password",
+        email_verification_id=uuid4(),
     )
     vkid_oauth.email = "ivan@example.com"
 
@@ -342,6 +358,7 @@ async def test_link_tutor_profile_requires_tutor_role(user_manager, db_connectio
         last_name="User",
         email="regular@example.com",
         password="password",
+        email_verification_id=uuid4(),
         role=UserRole.USER,
     )
 

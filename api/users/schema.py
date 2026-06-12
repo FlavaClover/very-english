@@ -1,5 +1,6 @@
 from uuid import UUID
 
+
 from pydantic import BaseModel, Field
 
 
@@ -22,6 +23,7 @@ class UserRegisterRequest(BaseModel):
     last_name: str = Field(min_length=1)
     email: str = Field(min_length=3)
     password: str = Field(min_length=8)
+    email_verification_id: UUID
 
 
 class UserLoginRequest(BaseModel):

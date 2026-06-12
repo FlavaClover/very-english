@@ -40,6 +40,18 @@ def _run_api() -> None:
     aws_endpoint_url = os.environ.get("AWS_ENDPOINT_URL")
     aws_public_endpoint_url = os.environ.get("AWS_PUBLIC_ENDPOINT_URL")
     redis_url = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
+    email_code_pepper = os.environ.get("EMAIL_CODE_PEPPER", jwt_secret_key)
+    email_code_ttl_seconds = int(
+        os.environ.get(
+            "EMAIL_OTP_CODE_TTL_SECONDS",
+            os.environ.get("EMAIL_CODE_TTL_SECONDS", "300"),
+        )
+    )
+    email_otp_code_length = int(os.environ.get("EMAIL_OTP_CODE_LENGTH", "6"))
+    email_verification_ttl_seconds = int(
+        os.environ.get("EMAIL_VERIFICATION_TTL_SECONDS", "3600")
+    )
+    email_queue_key = os.environ.get("EMAIL_QUEUE_KEY", "email:queue")
     yookassa_shop_id = os.environ["YOOKASSA_SHOP_ID"]
     yookassa_secret_key = os.environ["YOOKASSA_SECRET_KEY"]
     yookassa_webhook_ip_check_enabled = os.environ.get(
@@ -67,6 +79,11 @@ def _run_api() -> None:
         yookassa_webhook_ip_check_enabled=yookassa_webhook_ip_check_enabled,
         vk_id_client_id=vk_id_client_id,
         vk_id_redirect_uri=vk_id_redirect_uri,
+        email_code_pepper=email_code_pepper,
+        email_code_ttl_seconds=email_code_ttl_seconds,
+        email_otp_code_length=email_otp_code_length,
+        email_verification_ttl_seconds=email_verification_ttl_seconds,
+        email_queue_key=email_queue_key,
     )
     uvicorn.run(app, host=api_host, port=api_port)
 
@@ -123,13 +140,59 @@ async def _run_billing_sync(once: bool) -> None:
         await engine.dispose()
 
 
+async def _run_email_worker(once: bool) -> None:
+    import redis.asyncio as redis
+
+    from broker.email_worker import EmailWorker
+    from infra.email_verification import RedisEmailQueue
+    from infra.smtp_email_sender import SmtpEmailSender
+
+    redis_url = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
+    email_queue_key = os.environ.get("EMAIL_QUEUE_KEY", "email:queue")
+    smtp_host = os.environ["SMTP_HOST"]
+    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+    smtp_user = os.environ.get("SMTP_USERNAME", "")
+    smtp_password = os.environ.get("SMTP_PASSWORD", "")
+    smtp_from = os.environ["SMTP_FROM_ADDRESS"]
+    interval = float(os.environ.get("EMAIL_WORKER_INTERVAL_SECONDS", "1"))
+    dequeue_timeout = int(os.environ.get("EMAIL_DEQUEUE_TIMEOUT_SECONDS", "5"))
+
+    redis_client = redis.from_url(
+        redis_url,
+        decode_responses=True,
+        socket_timeout=dequeue_timeout + 5,
+        socket_connect_timeout=10,
+    )
+    queue = RedisEmailQueue(redis_client, email_queue_key)
+    sender = SmtpEmailSender(
+        host=smtp_host,
+        port=smtp_port,
+        username=smtp_user,
+        password=smtp_password,
+        from_address=smtp_from,
+    )
+    worker = EmailWorker(
+        queue=queue,
+        sender=sender,
+        interval_seconds=interval,
+        dequeue_timeout_seconds=dequeue_timeout,
+    )
+    try:
+        if once:
+            await worker.run_once()
+        else:
+            await worker.run()
+    finally:
+        await redis_client.aclose()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Very English backend")
     parser.add_argument(
         "command",
         nargs="?",
         default="api",
-        choices=["api", "billing-renew", "billing-sync-payments"],
+        choices=["api", "billing-renew", "billing-sync-payments", "email-worker"],
         help="Режим запуска (по умолчанию: api)",
     )
     parser.add_argument(
@@ -145,6 +208,8 @@ def main() -> None:
         asyncio.run(_run_billing_renew(args.once))
     elif args.command == "billing-sync-payments":
         asyncio.run(_run_billing_sync(args.once))
+    elif args.command == "email-worker":
+        asyncio.run(_run_email_worker(args.once))
 
 
 if __name__ == "__main__":

@@ -14,11 +14,16 @@ from infra.users import UsersPg
 from infra.views import TutorProfileViewAnalyticsPg, TutorProfileViewsPg
 from services.views import TutorProfileViewService
 from tests.conftest import seed_tutor
+from tests.email_verification_helpers import (
+    FixedCodeGenerator,
+    InMemoryEmailQueue,
+    register_user_via_api,
+)
 from tests.test_auth import FakeVkIdOAuth, InMemoryMedia
 
 
 @pytest.fixture
-def api_app(async_engine):
+def api_app(async_engine, redis_url):
     database_url = str(async_engine.url)
     app = create_server(
         database_url=database_url,
@@ -28,11 +33,15 @@ def api_app(async_engine):
         aws_endpoint_url="http://localhost:9000",
         yookassa_shop_id="test-shop",
         yookassa_secret_key="test-secret",
+        redis_url=redis_url,
+        email_code_pepper="test-email-pepper",
     )
     app.state.db_engine = async_engine
     app.state.media = InMemoryMedia()
     app.state.vkid_client = FakeVkIdOAuth()
     app.state.yookassa_client = MagicMock(spec=YooKassaClient)
+    app.state.test_email_queue = InMemoryEmailQueue()
+    app.state.email_code_generator = FixedCodeGenerator("123456")
     return app
 
 
@@ -103,16 +112,12 @@ async def test_api_recent_tutor_profiles_endpoint(api_app, db_connection):
 
     transport = ASGITransport(app=api_app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        register = await client.post(
-            "/auth/register",
-            json={
-                "first_name": "Anna",
-                "last_name": "User",
-                "email": email,
-                "password": "secret-password",
-            },
+        await register_user_via_api(
+            client,
+            email,
+            first_name="Anna",
+            last_name="User",
         )
-        assert register.status_code == 200
         login = await client.post(
             "/auth/login",
             json={"email": email, "password": "secret-password"},
@@ -244,16 +249,12 @@ async def test_api_clear_and_remove_recent_tutor_profiles(api_app, db_connection
 
     transport = ASGITransport(app=api_app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        register = await client.post(
-            "/auth/register",
-            json={
-                "first_name": "Anna",
-                "last_name": "User",
-                "email": email,
-                "password": "secret-password",
-            },
+        await register_user_via_api(
+            client,
+            email,
+            first_name="Anna",
+            last_name="User",
         )
-        assert register.status_code == 200
         login = await client.post(
             "/auth/login",
             json={"email": email, "password": "secret-password"},

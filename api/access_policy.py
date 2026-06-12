@@ -23,6 +23,16 @@ class EndpointAccessRule:
 
 
 ENDPOINT_ACCESS_RULES: dict[tuple[str, str], EndpointAccessRule] = {
+    ("POST", "/auth/send-code"): EndpointAccessRule(
+        method="POST",
+        path="/auth/send-code",
+        require_jwt=False,
+    ),
+    ("POST", "/auth/verify-email"): EndpointAccessRule(
+        method="POST",
+        path="/auth/verify-email",
+        require_jwt=False,
+    ),
     ("POST", "/auth/register"): EndpointAccessRule(
         method="POST",
         path="/auth/register",

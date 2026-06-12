@@ -4,11 +4,12 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from api.server import create_server
+from tests.email_verification_helpers import FixedCodeGenerator, InMemoryEmailQueue
 from tests.test_auth import FakeVkIdOAuth
 
 
 @pytest.fixture
-def api_app(async_engine):
+def api_app(async_engine, redis_url):
     database_url = str(async_engine.url)
     app = create_server(
         database_url=database_url,
@@ -18,10 +19,39 @@ def api_app(async_engine):
         aws_endpoint_url="http://localhost:9000",
         yookassa_shop_id="test-shop",
         yookassa_secret_key="test-secret",
+        redis_url=redis_url,
+        email_code_pepper="test-email-pepper",
     )
     app.state.db_engine = async_engine
     app.state.vkid_client = FakeVkIdOAuth()
+    app.state.test_email_queue = InMemoryEmailQueue()
+    app.state.email_code_generator = FixedCodeGenerator("123456")
     return app
+
+
+async def _register_with_verified_email(client, email: str) -> dict:
+    send_response = await client.post("/auth/send-code", json={"email": email})
+    assert send_response.status_code == 204
+
+    verify_response = await client.post(
+        "/auth/verify-email",
+        json={"email": email, "code": "123456"},
+    )
+    assert verify_response.status_code == 200
+    verification_id = verify_response.json()["email_verification_id"]
+
+    register_response = await client.post(
+        "/auth/register",
+        json={
+            "first_name": "Ivan",
+            "last_name": "Ivanov",
+            "email": email,
+            "password": "secret-password",
+            "email_verification_id": verification_id,
+        },
+    )
+    assert register_response.status_code == 200
+    return register_response.json()
 
 
 @pytest.mark.asyncio
@@ -29,17 +59,8 @@ async def test_register_and_login(api_app):
     transport = ASGITransport(app=api_app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         email = f"user-{uuid4()}@example.com"
-        register_response = await client.post(
-            "/auth/register",
-            json={
-                "first_name": "Ivan",
-                "last_name": "Ivanov",
-                "email": email,
-                "password": "secret-password",
-            },
-        )
-        assert register_response.status_code == 200
-        assert register_response.json()["email"] == email
+        body = await _register_with_verified_email(client, email)
+        assert body["email"] == email
 
         login_response = await client.post(
             "/auth/login",
@@ -94,6 +115,13 @@ async def test_register_tutor_minimal(api_app):
     transport = ASGITransport(app=api_app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         email = f"tutor-{uuid4()}@example.com"
+        await client.post("/auth/send-code", json={"email": email})
+        verify_response = await client.post(
+            "/auth/verify-email",
+            json={"email": email, "code": "123456"},
+        )
+        verification_id = verify_response.json()["email_verification_id"]
+
         register_response = await client.post(
             "/auth/register/tutor",
             json={
@@ -101,6 +129,7 @@ async def test_register_tutor_minimal(api_app):
                 "last_name": "Petrova",
                 "email": email,
                 "password": "secret-password",
+                "email_verification_id": verification_id,
             },
         )
         assert register_response.status_code == 200

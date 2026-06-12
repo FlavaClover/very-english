@@ -16,12 +16,17 @@ from billing.subscriptions import (
 )
 from infra.subscriptions import SubscriptionsPg
 from infra.users import UsersPg
+from tests.email_verification_helpers import (
+    FixedCodeGenerator,
+    InMemoryEmailQueue,
+    register_user_via_api,
+)
 from tests.conftest import seed_tutor
 from tests.test_auth import FakeVkIdOAuth, InMemoryMedia
 
 
 @pytest.fixture
-def api_app(async_engine):
+def api_app(async_engine, redis_url):
     database_url = str(async_engine.url)
     app = create_server(
         database_url=database_url,
@@ -31,11 +36,15 @@ def api_app(async_engine):
         aws_endpoint_url="http://localhost:9000",
         yookassa_shop_id="test-shop",
         yookassa_secret_key="test-secret",
+        redis_url=redis_url,
+        email_code_pepper="test-email-pepper",
     )
     app.state.db_engine = async_engine
     app.state.media = InMemoryMedia()
     app.state.vkid_client = FakeVkIdOAuth()
     app.state.yookassa_client = MagicMock(spec=YooKassaClient)
+    app.state.test_email_queue = InMemoryEmailQueue()
+    app.state.email_code_generator = FixedCodeGenerator("123456")
     return app
 
 
@@ -70,16 +79,12 @@ async def test_catalog_tutor_profile_includes_media_urls(api_app, db_connection)
     viewer_email = f"viewer-{uuid4()}@example.com"
     transport = ASGITransport(app=api_app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        register = await client.post(
-            "/auth/register",
-            json={
-                "first_name": "Viewer",
-                "last_name": "User",
-                "email": viewer_email,
-                "password": "secret-password",
-            },
+        await register_user_via_api(
+            client,
+            viewer_email,
+            first_name="Viewer",
+            last_name="User",
         )
-        assert register.status_code == 200
         login = await client.post(
             "/auth/login",
             json={"email": viewer_email, "password": "secret-password"},

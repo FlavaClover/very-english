@@ -15,6 +15,7 @@ from api.billing.webhook import router as billing_router
 from api.catalog.endpoints import router as catalog_router
 from api.dependencies import (
     MEDIA_URL_CACHE_TTL_SECONDS,
+    get_email_verification_service,
     get_media,
     get_subscription_service,
     get_tags_manager,
@@ -37,6 +38,7 @@ from auth.vkid import VkIdClient
 from billing.yookassa_client import YooKassaClient
 from billing.yookassa_webhook_ip import YooKassaWebhookIpValidator
 from services.subscription import AbstractSubscriptionService
+from auth.email_verification import AbstractEmailVerificationService
 from services.views import AbstractTutorProfileViewService
 from core.tutors import Media, TutorFilter
 from services.tags import AbstractTagsManager
@@ -62,6 +64,11 @@ def create_server(
     yookassa_webhook_ip_check_enabled: bool = True,
     vk_id_client_id: str = "",
     vk_id_redirect_uri: str = "",
+    email_code_pepper: str = "",
+    email_code_ttl_seconds: int = 300,
+    email_otp_code_length: int = 6,
+    email_verification_ttl_seconds: int = 3600,
+    email_queue_key: str = "email:queue",
 ) -> FastAPI:
     """Собирает FastAPI-приложение с DI, middleware и роутерами."""
     db_engine = create_async_engine(
@@ -109,6 +116,11 @@ def create_server(
     app.state.aws_endpoint_url = aws_endpoint_url
     app.state.aws_public_endpoint_url = aws_public_endpoint_url
     app.state.redis = redis.from_url(redis_url, decode_responses=True)
+    app.state.email_code_pepper = email_code_pepper
+    app.state.email_code_ttl_seconds = email_code_ttl_seconds
+    app.state.email_otp_code_length = email_otp_code_length
+    app.state.email_verification_ttl_seconds = email_verification_ttl_seconds
+    app.state.email_queue_key = email_queue_key
     app.state.media = S3Media(
         session=app.state.s3_session,
         bucket=s3_bucket,
@@ -143,6 +155,9 @@ def create_server(
     app.dependency_overrides[Media] = get_media
     app.dependency_overrides[Users] = get_users
     app.dependency_overrides[AbstractUserManager] = get_user_manager
+    app.dependency_overrides[AbstractEmailVerificationService] = (
+        get_email_verification_service
+    )
     app.dependency_overrides[AbstractTutorManager] = get_tutor_manager
     app.dependency_overrides[AbstractTagsManager] = get_tags_manager
     app.dependency_overrides[TutorFilter] = get_tutor_filter

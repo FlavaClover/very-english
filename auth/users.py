@@ -9,6 +9,7 @@ from auth.exceptions import (
     UserNotFoundError,
     VkIdAuthError,
 )
+from auth.email_verification import AbstractEmailVerificationService, normalize_email
 from auth.jwt import JwtIssuer, TokenPair
 from auth.models import User, UserRole
 from auth.passwords import PasswordHasher
@@ -83,6 +84,7 @@ class AbstractUserManager(ABC):
         last_name: str,
         email: str,
         password: str,
+        email_verification_id: UUID,
         role: UserRole = UserRole.USER,
     ) -> User:
         pass
@@ -147,12 +149,14 @@ class UserManager(AbstractUserManager):
         password_hasher: PasswordHasher,
         jwt_issuer: JwtIssuer,
         vkid_oauth: VkIdOAuth,
+        email_verification_service: AbstractEmailVerificationService,
     ) -> None:
         self._users = users
         self._media = media
         self._password_hasher = password_hasher
         self._jwt = jwt_issuer
         self._vkid_oauth = vkid_oauth
+        self._email_verification = email_verification_service
 
     async def register(
         self,
@@ -160,6 +164,7 @@ class UserManager(AbstractUserManager):
         last_name: str,
         email: str,
         password: str,
+        email_verification_id: UUID,
         role: UserRole = UserRole.USER,
     ) -> User:
         """Регистрирует нового пользователя.
@@ -168,18 +173,27 @@ class UserManager(AbstractUserManager):
         :param last_name: Фамилия пользователя.
         :param email: Адрес электронной почты.
         :param password: Пароль в открытом виде.
+        :param email_verification_id: Идентификатор подтверждения почты.
         :param role: Роль пользователя.
         :return: Созданный пользователь без пароля.
         :raises UserAlreadyExistsError: Если email уже занят.
+        :raises EmailVerificationNotFoundError: Если подтверждение недоступно.
+        :raises EmailVerificationMismatchError: Если email не совпадает с подтверждённым.
         """
-        if await self._users.is_email_taken(email):
+        normalized_email = normalize_email(email)
+        await self._email_verification.consume_verification(
+            email_verification_id,
+            normalized_email,
+        )
+
+        if await self._users.is_email_taken(normalized_email):
             raise UserAlreadyExistsError
 
         user = User(
             id=uuid4(),
             first_name=first_name,
             last_name=last_name,
-            email=email,
+            email=normalized_email,
             role=role,
         )
         password_hash = self._password_hasher.hash(password)

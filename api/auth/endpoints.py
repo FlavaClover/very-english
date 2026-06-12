@@ -2,7 +2,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response
 
-from api.auth.schema import VkIdLoginRequest
+from api.auth.schema import (
+    SendEmailCodeRequest,
+    VerifyEmailRequest,
+    VerifyEmailResponse,
+    VkIdLoginRequest,
+)
 from api.schema import ErrorResponse
 from api.users.schema import (
     RefreshTokenRequest,
@@ -12,16 +17,66 @@ from api.users.schema import (
     UserResponse,
 )
 from auth.exceptions import (
+    EmailAlreadyRegisteredError,
+    EmailVerificationMismatchError,
+    EmailVerificationNotFoundError,
     InvalidCredentialsError,
     InvalidTokenError,
+    InvalidVerificationCodeError,
     UserAlreadyExistsError,
     UserNotFoundError,
     VkIdAuthError,
 )
 from auth.models import UserRole
 from auth.users import AbstractUserManager
+from auth.email_verification import AbstractEmailVerificationService
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
+
+
+@router.post(
+    "/send-code",
+    status_code=204,
+    responses={400: {"model": ErrorResponse}},
+    summary="Отправить код подтверждения на email",
+)
+async def send_email_code(
+    payload: SendEmailCodeRequest,
+    email_verification_service: Annotated[AbstractEmailVerificationService, Depends()],
+) -> Response:
+    try:
+        await email_verification_service.send_code(payload.email)
+    except EmailAlreadyRegisteredError as exc:
+        return Response(
+            content=ErrorResponse(detail=str(exc)).model_dump_json(),
+            status_code=400,
+            media_type="application/json",
+        )
+    return Response(status_code=204)
+
+
+@router.post(
+    "/verify-email",
+    response_model=VerifyEmailResponse,
+    responses={400: {"model": ErrorResponse}},
+    summary="Подтвердить email по коду",
+)
+async def verify_email(
+    payload: VerifyEmailRequest,
+    email_verification_service: Annotated[AbstractEmailVerificationService, Depends()],
+) -> VerifyEmailResponse | Response:
+    try:
+        verification_id = await email_verification_service.verify_email(
+            payload.email,
+            payload.code,
+        )
+    except InvalidVerificationCodeError as exc:
+        return Response(
+            content=ErrorResponse(detail=str(exc)).model_dump_json(),
+            status_code=400,
+            media_type="application/json",
+        )
+    return VerifyEmailResponse(email_verification_id=verification_id)
 
 
 @router.post(
@@ -40,8 +95,21 @@ async def register_user(
             last_name=payload.last_name,
             email=payload.email,
             password=payload.password,
+            email_verification_id=payload.email_verification_id,
         )
     except UserAlreadyExistsError as exc:
+        return Response(
+            content=ErrorResponse(detail=str(exc)).model_dump_json(),
+            status_code=400,
+            media_type="application/json",
+        )
+    except EmailVerificationNotFoundError as exc:
+        return Response(
+            content=ErrorResponse(detail=str(exc)).model_dump_json(),
+            status_code=400,
+            media_type="application/json",
+        )
+    except EmailVerificationMismatchError as exc:
         return Response(
             content=ErrorResponse(detail=str(exc)).model_dump_json(),
             status_code=400,
@@ -73,9 +141,22 @@ async def register_tutor(
             last_name=payload.last_name,
             email=payload.email,
             password=payload.password,
+            email_verification_id=payload.email_verification_id,
             role=UserRole.TUTOR,
         )
     except UserAlreadyExistsError as exc:
+        return Response(
+            content=ErrorResponse(detail=str(exc)).model_dump_json(),
+            status_code=400,
+            media_type="application/json",
+        )
+    except EmailVerificationNotFoundError as exc:
+        return Response(
+            content=ErrorResponse(detail=str(exc)).model_dump_json(),
+            status_code=400,
+            media_type="application/json",
+        )
+    except EmailVerificationMismatchError as exc:
         return Response(
             content=ErrorResponse(detail=str(exc)).model_dump_json(),
             status_code=400,

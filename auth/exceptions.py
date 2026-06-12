@@ -16,3 +16,19 @@ class InvalidTokenError(Exception):
 
 class VkIdAuthError(Exception):
     """Ошибка авторизации через VK ID."""
+
+
+class EmailAlreadyRegisteredError(Exception):
+    """Адрес электронной почты уже зарегистрирован."""
+
+
+class InvalidVerificationCodeError(Exception):
+    """Код подтверждения неверен или просрочен."""
+
+
+class EmailVerificationNotFoundError(Exception):
+    """Подтверждение почты не найдено или недоступно для регистрации."""
+
+
+class EmailVerificationMismatchError(Exception):
+    """Email при регистрации не совпадает с подтверждённым."""

@@ -7,6 +7,7 @@ from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import NullPool
 from testcontainers.postgres import PostgresContainer
+from testcontainers.redis import RedisContainer
 
 from auth.models import User, UserRole
 from core.models import Contact, Level, Tutor, TutorStatus, WorkFormat
@@ -14,6 +15,19 @@ from infra.contacts import ContactsPg
 from infra.tags import TagsPg
 from infra.tutors import TutorsPg
 from infra.users import UsersPg
+
+
+@pytest.fixture(scope="session")
+def redis_container():
+    with RedisContainer("redis:7-alpine") as redis_instance:
+        yield redis_instance
+
+
+@pytest.fixture(scope="session")
+def redis_url(redis_container) -> str:
+    host = redis_container.get_container_host_ip()
+    port = redis_container.get_exposed_port(6379)
+    return f"redis://{host}:{port}/0"
 
 
 @pytest.fixture(scope="session")
@@ -62,6 +76,7 @@ def clean_db(engine: Engine) -> None:
                     tutor_subscriptions,
                     payments,
                     subscription_plans,
+                    email_verifications,
                     users_tutor,
                     users,
                     points,

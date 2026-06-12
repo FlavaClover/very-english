@@ -95,6 +95,9 @@ services:
       REDIS_URL: redis://redis:6379/0
       YOOKASSA_SHOP_ID: ${YOOKASSA_SHOP_ID:-}
       YOOKASSA_SECRET_KEY: ${YOOKASSA_SECRET_KEY:-}
+      EMAIL_OTP_CODE_TTL_SECONDS: ${EMAIL_OTP_CODE_TTL_SECONDS:-300}
+      EMAIL_OTP_CODE_LENGTH: ${EMAIL_OTP_CODE_LENGTH:-6}
+
     depends_on:
       postgres:
         condition: service_healthy
@@ -139,6 +142,35 @@ services:
       migrate:
         condition: service_completed_successfully
     restart: unless-stopped
+
+  email-worker:
+    build:
+      context: .
+      args: *build-proxy-args
+    command: ["poetry", "run", "python", "main.py", "email-worker"]
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      EMAIL_QUEUE_KEY: email:queue
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_ADDRESS: ${SMTP_FROM_ADDRESS:-noreply@very-english.local}
+      EMAIL_OTP_CODE_TTL_SECONDS: ${EMAIL_OTP_CODE_TTL_SECONDS:-300}
+      EMAIL_OTP_CODE_LENGTH: ${EMAIL_OTP_CODE_LENGTH:-6}
+      EMAIL_CODE_PEPPER: ${EMAIL_CODE_PEPPER:-}
+      EMAIL_WORKER_INTERVAL_SECONDS: "1"
+      EMAIL_DEQUEUE_TIMEOUT_SECONDS: "5"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"
+      - "1025:1025"
 
 volumes:
   postgres_data:

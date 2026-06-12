@@ -8,9 +8,14 @@ from auth.passwords import BcryptPasswordHasher, PasswordHasher
 from auth.users import AbstractUserManager, UserManager, Users
 from auth.vkid import VkIdOAuth
 from billing.yookassa_client import YooKassaClient
-from services.subscription import AbstractSubscriptionService
+from services.subscription import AbstractSubscriptionService, SubscriptionService
 from services.views import AbstractTutorProfileViewService, TutorProfileViewService
 from infra.payments import PaymentsPg
+from infra.email_verification import (
+    EmailVerificationsPg,
+    RedisEmailQueue,
+    VerificationCodeHasher,
+)
 from infra.users import UsersPg
 from core.tutors import Media, TutorFilter
 from services.tags import AbstractTagsManager, TagsManager
@@ -23,7 +28,8 @@ from infra.subscriptions import SubscriptionsPg
 from infra.tutor_filter import TutorFilterPg
 from infra.views import TutorProfileViewAnalyticsPg, TutorProfileViewsPg
 from infra.tutors import TutorsPg
-from services.subscription import SubscriptionService
+from auth.email_verification import AbstractEmailVerificationService
+from services.email_verification import EmailVerificationService, RandomCodeGenerator
 
 MEDIA_URL_CACHE_TTL_SECONDS = 3600
 
@@ -72,6 +78,7 @@ def build_user_manager(
     jwt_issuer: JwtIssuer,
     password_hasher: PasswordHasher,
     vkid_oauth: VkIdOAuth,
+    email_verification_service: AbstractEmailVerificationService,
 ) -> UserManager:
     return UserManager(
         users=UsersPg(conn),
@@ -79,6 +86,38 @@ def build_user_manager(
         password_hasher=password_hasher,
         jwt_issuer=jwt_issuer,
         vkid_oauth=vkid_oauth,
+        email_verification_service=email_verification_service,
+    )
+
+
+def build_email_verification_service(
+    conn: AsyncConnection,
+    users: Users,
+    request: Request,
+) -> EmailVerificationService:
+    test_queue = getattr(request.app.state, "test_email_queue", None)
+    if test_queue is None:
+        test_queue = RedisEmailQueue(
+            client=request.app.state.redis,
+            queue_key=request.app.state.email_queue_key,
+        )
+    code_generator = getattr(
+        request.app.state,
+        "email_code_generator",
+        None,
+    )
+    if code_generator is None:
+        code_generator = RandomCodeGenerator(
+            length=request.app.state.email_otp_code_length,
+        )
+    return EmailVerificationService(
+        verifications=EmailVerificationsPg(conn),
+        users=users,
+        queue=test_queue,
+        code_hasher=VerificationCodeHasher(request.app.state.email_code_pepper),
+        code_generator=code_generator,
+        code_ttl_seconds=request.app.state.email_code_ttl_seconds,
+        verification_ttl_seconds=request.app.state.email_verification_ttl_seconds,
     )
 
 
@@ -95,26 +134,42 @@ async def get_tags_manager(
     return build_tags_manager(conn)
 
 
+async def get_users(
+    conn: AsyncConnection = Depends(get_connection),
+) -> Users:
+    return UsersPg(conn)
+
+
+async def get_email_verification_service(
+    request: Request,
+    conn: AsyncConnection = Depends(get_connection),
+    users: Users = Depends(get_users),
+) -> AbstractEmailVerificationService:
+    return build_email_verification_service(conn, users, request)
+
+
 async def get_user_manager(
     conn: AsyncConnection = Depends(get_connection),
     media: Media = Depends(get_media),
     jwt_issuer: JwtIssuer = Depends(get_jwt_issuer),
     password_hasher: PasswordHasher = Depends(get_password_hasher),
     vkid_oauth: VkIdOAuth = Depends(get_vkid_oauth),
+    email_verification_service: AbstractEmailVerificationService = Depends(),
 ) -> AbstractUserManager:
-    return build_user_manager(conn, media, jwt_issuer, password_hasher, vkid_oauth)
+    return build_user_manager(
+        conn,
+        media,
+        jwt_issuer,
+        password_hasher,
+        vkid_oauth,
+        email_verification_service,
+    )
 
 
 async def get_tutor_filter(
     conn: AsyncConnection = Depends(get_connection),
 ) -> TutorFilter:
     return TutorFilterPg(conn)
-
-
-async def get_users(
-    conn: AsyncConnection = Depends(get_connection),
-) -> Users:
-    return UsersPg(conn)
 
 
 def get_yookassa_client(request: Request) -> YooKassaClient:
